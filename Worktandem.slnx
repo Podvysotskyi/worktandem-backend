@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Worktandem.Organization/Worktandem.Organization.csproj" />
+    <Project Path="src/Worktandem.Gateway/Worktandem.Gateway.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Worktandem.SmokeTests/Worktandem.SmokeTests.csproj" />
+  </Folder>
+</Solution>
