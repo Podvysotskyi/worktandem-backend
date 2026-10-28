@@ -17,7 +17,7 @@ public class HostTests
     [InlineData("Production", "/organizations", HttpStatusCode.NotFound)]
     public async Task Hosts_expose_only_scaffold_endpoints(string environment, string path, HttpStatusCode expected)
     {
-        await AssertEndpoint<Organization.Program>(environment, path, expected);
+        await AssertEndpoint<Organization.Api.Program>(environment, path, expected);
         await AssertEndpoint<Gateway.Program>(environment, path, expected);
     }
 

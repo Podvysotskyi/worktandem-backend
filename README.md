@@ -15,7 +15,7 @@ dotnet test Worktandem.slnx --configuration Release --no-build
 Start each independent executable in a separate terminal:
 
 ```sh
-dotnet run --project src/Worktandem.Organization -- --urls http://localhost:5101 --environment Development
+dotnet run --project src/Worktandem.Organization.Api -- --urls http://localhost:5101 --environment Development
 dotnet run --project src/Worktandem.Gateway -- --urls http://localhost:5100 --environment Development
 ```
 
@@ -32,15 +32,18 @@ Default environment is Production; OpenAPI is not exposed there.
 
 ## Services
 
-- `src/Worktandem.Organization`: owns the future Organization & Access domain.
+- `src/Worktandem.Organization.Domain`: future Organization & Access business rules (framework-free).
+- `src/Worktandem.Organization.Application`: future use cases and ports; depends only on Domain.
+- `src/Worktandem.Organization.Infrastructure`: future adapters and service-owned migrations; depends on Application.
+- `src/Worktandem.Organization.Api`: executable HTTP host and composition root.
 - `src/Worktandem.Gateway`: thin future BFF host; no proxying, data store, or business logic yet.
-- `tests/Worktandem.SmokeTests`: in-memory HTTP tests for both hosts in development/production.
+- `tests/Worktandem.SmokeTests`: in-memory HTTP tests for both hosts plus executable project-dependency rules.
 
 **Authentication and authorization are not implemented.** There are deliberately no
 organization, membership, role, or other business endpoints. Health endpoints are
 anonymous operational probes. Do not expose this scaffold as a production application.
 No authentication provider, database, broker, orchestration stack, or RBAC engine is selected.
 
-Publish/deploy hosts independently with `dotnet publish <project> -c Release`.
+Publish/deploy the Api and Gateway hosts independently with `dotnet publish <project> -c Release`.
 Container packaging is deferred until it can be built and tested.
 See [architecture](docs/architecture.md) for boundaries and the next decisions.

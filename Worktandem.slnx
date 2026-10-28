@@ -1,6 +1,9 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/Worktandem.Organization/Worktandem.Organization.csproj" />
+    <Project Path="src/Worktandem.Organization.Domain/Worktandem.Organization.Domain.csproj" />
+    <Project Path="src/Worktandem.Organization.Application/Worktandem.Organization.Application.csproj" />
+    <Project Path="src/Worktandem.Organization.Infrastructure/Worktandem.Organization.Infrastructure.csproj" />
+    <Project Path="src/Worktandem.Organization.Api/Worktandem.Organization.Api.csproj" />
     <Project Path="src/Worktandem.Gateway/Worktandem.Gateway.csproj" />
   </Folder>
   <Folder Name="/tests/">

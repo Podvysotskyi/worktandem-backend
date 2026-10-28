@@ -5,7 +5,11 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4"><PrivateAssets>all</PrivateAssets></PackageReference>
-    <ProjectReference Include="../../src/Worktandem.Organization/Worktandem.Organization.csproj" />
+    <ProjectReference Include="../../src/Worktandem.Organization.Api/Worktandem.Organization.Api.csproj" />
     <ProjectReference Include="../../src/Worktandem.Gateway/Worktandem.Gateway.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Copy project definitions so dependency tests also work outside the source tree. -->
+    <Content Include="../../src/**/*.csproj" Link="Architecture/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
