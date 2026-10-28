@@ -16,8 +16,40 @@ host. Do not add speculative services or distributed infrastructure.
 Neither service references the other. The test harness references both only to host
 them in isolation. Future communication must use explicit API/event contracts, not
 shared persistence entities, cross-service SQL, or a shared DbContext. Each service
-owns its schema and migrations. `Organization/Migrations` reserves that boundary;
+owns its schema and migrations. `Worktandem.Organization.Infrastructure/Migrations` reserves that boundary;
 there is no database or migration execution today. The Gateway should remain stateless.
+
+## Clean Architecture inside Organization
+
+Dependencies point inward:
+
+```text
+Api -> Application -> Domain
+Api -> Infrastructure -> Application
+Gateway (separate executable, no Organization project references)
+```
+
+- **Domain**: business invariants, value objects and entities once needed. No HTTP,
+  persistence, messaging, framework packages, or application-layer references.
+- **Application**: use cases, application contracts and ports required by those use
+  cases. Depends only on Domain, not ASP.NET Core or infrastructure implementations.
+- **Infrastructure**: adapters implementing application ports; owns persistence,
+  migrations and external integrations when selected. Domain is transitively available
+  through Application. Do not expose persistence entities as API contracts.
+- **Api**: transport DTOs/endpoints, request mapping and composition root. Its reference
+  to Infrastructure exists for dependency registration, not to bypass application use cases.
+
+The layers are intentionally empty until the first authorized business use case.
+There are no invented entities, generic repositories, mediator/event-bus libraries,
+identity stubs, or database dependencies. Add abstractions only at actual boundaries.
+Gateway remains a thin BFF rather than receiving artificial domain layers.
+
+`ArchitectureTests` assert the allowed project-reference graph and framework-free
+inner project definitions, alongside host smoke tests. These are initial guardrails,
+not proof of semantic separation: review future source code, shared build props and
+transitive dependencies too. Introduce targeted business-rule/unit tests alongside
+real use cases, adapter integration tests with real dependencies, and denied-access
+HTTP tests before implementing protected operations.
 
 ## Security before features
 

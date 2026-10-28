@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-namespace Worktandem.Organization;
+namespace Worktandem.Organization.Api;
 
 public partial class Program
 {

@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Worktandem.Organization.Application/Worktandem.Organization.Application.csproj" />
+  </ItemGroup>
+</Project>
