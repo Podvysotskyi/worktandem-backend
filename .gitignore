@@ -1,8 +1,33 @@
+# Build and test output
 **/bin/
 **/obj/
+artifacts/
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+*.binlog
+
+# Local IDE state
 .vs/
 .idea/
-TestResults/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Local environment configuration
 .env
 .env.*
 !.env.example
+!.env.*.example
+appsettings.*.local.json
+
+# Logs, editor backups, and operating system files
+*.log
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
