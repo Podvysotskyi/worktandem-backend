@@ -13,6 +13,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - run: dotnet restore Worktandem.slnx
+      - run: dotnet tool restore
+      - run: dotnet restore Worktandem.slnx --locked-mode
       - run: dotnet build Worktandem.slnx --configuration Release --no-restore
       - run: dotnet test Worktandem.slnx --configuration Release --no-build --logger trx

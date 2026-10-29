@@ -1,82 +1,62 @@
-# Initial backend architecture
+# Backend architecture
 
-## Decision
+## Current implementation
 
-Use ASP.NET Core on .NET 10 LTS with independently deployable service executables.
-Keep the starting footprint small: Organization & Access ownership plus a Gateway/BFF
-host. Do not add speculative services or distributed infrastructure.
-
-## Boundaries
-
-| Host | Owns now | Planned responsibility |
-| --- | --- | --- |
-| Organization | Process, health, development OpenAPI | Organizations, memberships, scoped roles and access policy |
-| Gateway | Process, health, development OpenAPI | UI-facing composition and routing, not domain ownership |
-
-Neither service references the other. The test harness references both only to host
-them in isolation. Future communication must use explicit API/event contracts, not
-shared persistence entities, cross-service SQL, or a shared DbContext. Each service
-owns its schema and migrations. `Worktandem.Organization.Infrastructure/Migrations` reserves that boundary;
-there is no database or migration execution today. The Gateway should remain stateless.
-
-## Clean Architecture inside Organization
-
-Dependencies point inward:
+ASP.NET Core on .NET 10 with independent Identity, Organization and Gateway executables.
+Identity and Organization each follow:
 
 ```text
 Api -> Application -> Domain
 Api -> Infrastructure -> Application
-Gateway (separate executable, no Organization project references)
 ```
 
-- **Domain**: business invariants, value objects and entities once needed. No HTTP,
-  persistence, messaging, framework packages, or application-layer references.
-- **Application**: use cases, application contracts and ports required by those use
-  cases. Depends only on Domain, not ASP.NET Core or infrastructure implementations.
-- **Infrastructure**: adapters implementing application ports; owns persistence,
-  migrations and external integrations when selected. Domain is transitively available
-  through Application. Do not expose persistence entities as API contracts.
-- **Api**: transport DTOs/endpoints, request mapping and composition root. Its reference
-  to Infrastructure exists for dependency registration, not to bypass application use cases.
+Domain contains framework-free entities/enums for the first persistence slice, with explicit
+IDs, UTC instants and Guid versions. Application reserves the use-case/port boundary; it has
+no fake identity/authorization services or generic repository framework. Infrastructure maps
+its own domain and owns Npgsql migrations/snapshots. Api composes persistence and probes.
+No persistence entities are HTTP DTOs; no business HTTP contract is enabled.
 
-The layers are intentionally empty until the first authorized business use case.
-There are no invented entities, generic repositories, mediator/event-bus libraries,
-identity stubs, or database dependencies. Add abstractions only at actual boundaries.
-Gateway remains a thin BFF rather than receiving artificial domain layers.
+Neither service references the other's projects or SQL objects. AccountId fields in Organization
+are external identifiers only. Gateway has no domain layers, tables, direct DbContext or service
+implementation references. Cross-service session validation will require an explicit authenticated
+contract; it is not implemented by this schema.
 
-`ArchitectureTests` assert the allowed project-reference graph and framework-free
-inner project definitions, alongside host smoke tests. These are initial guardrails,
-not proof of semantic separation: review future source code, shared build props and
-transitive dependencies too. Introduce targeted business-rule/unit tests alongside
-real use cases, adapter integration tests with real dependencies, and denied-access
-HTTP tests before implementing protected operations.
+Architecture tests assert both service graphs and package-free inner layers. Source and transitive
+dependencies must also be reviewed; project-reference tests do not prove semantic authorization.
 
-## Security before features
+## Storage boundaries
 
-Select an identity provider and token/session model first. Authentication must validate
-issuer, audience, signature, expiry, and intended client flow. Backend services must
-enforce authorization themselves, not trust the Gateway as their only security boundary.
-Plan organization-scoped RBAC: the authenticated principal's membership, organization
-scope, and permission must be checked for every protected operation. Never trust a
-client-supplied organization ID or role alone. No policy engine or mock identity exists.
-Do not add business routes before these controls and negative authorization tests exist.
+[Persistence details](persistence.md) describe separate PostgreSQL databases, tenant composite
+foreign keys, partial Google uniqueness, immutable history, restrictive deletion and optimistic
+concurrency. No distributed transaction or cross-database relationship exists. The startup hosts
+never create or migrate schemas. Migration deployment is a controlled job with its own credentials.
 
-## Operational contract
+Company approval/candidate activation, no self-review, account/session eligibility, complete
+permission/scope evaluation and last-owner protection are future application workflows. Checks
+and keys constrain stored shape; they do not establish that a caller is authorized. There are
+no EF global query filters presented as access control.
 
-Liveness is process-only. Readiness presently means this dependency-free host can
-serve requests. Add actual dependency checks, startup/migration strategy, timeouts,
-and failure-mode tests as persistence/downstream calls are introduced. Keep public
-probe responses minimal; restrict probe access at deployment ingress if needed.
-OpenAPI documents are development-only. HTTPS termination, trusted forwarded headers,
-allowed hosts, telemetry/export, secrets, deployment infrastructure, and CI hardening
-remain deployment decisions; this scaffold makes no production-readiness claim.
+Only company-scoped roles/assignments are mapped for the initial owner-activation path.
+Own/department/team scoped roles, organizational structures, invitations, directory integration
+and CRM modules stay deferred. Platform grants in Identity never imply a company membership.
 
-## Next decisions
+## Operational and security contract
 
-1. Identity provider, login flow and organization-scoped authorization contract.
-2. First organization use case and its API contract, including denied-access tests.
-3. Organization-owned persistence and migration tooling.
-4. Implement Gateway routing/composition only for an actual client need.
-5. Verify container packaging and deployment probes in the chosen runtime.
+Liveness asserts the process can respond. Identity/Organization readiness checks connection and
+pending migrations; missing configuration/database/schema fails closed with 503. Gateway readiness
+remains process-only. OpenAPI is development-only. No auth cookies, Google callbacks, bootstrap
+secret handling, registration, protected business operations or public status writes exist yet.
 
-.NET support reference: https://dotnet.microsoft.com/en-us/platform/support/policy
+Before enabling any protected operation, implement independently enforced current Identity
+status/session validation, Organization company/membership/scope checks, negative cross-tenant
+tests, CSRF/session protocol and authenticated internal transport. No caller-supplied tenant or
+actor header can become authority. Pending companies grant no business access, and global versus
+membership suspension remain independent.
+
+The first-owner transaction race test is controlled persistence scaffolding. It does not validate
+a Google proof/secret, enforce registration gates or implement the bootstrap use case. Those arrive
+with PR2. Privileged assurance must be verified with the actual Google client; recovery/last-owner
+policy and invitation mailbox proof remain gated before their respective rollout.
+
+Trusted proxy configuration, allowed hosts, durable Data Protection, runtime roles, telemetry,
+secrets and deployment are still environment decisions. This foundation is not production readiness.
