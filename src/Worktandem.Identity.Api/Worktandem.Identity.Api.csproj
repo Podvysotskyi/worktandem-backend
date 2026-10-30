@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.14" />
+    <ProjectReference Include="../Worktandem.Identity.Application/Worktandem.Identity.Application.csproj" />
+    <ProjectReference Include="../Worktandem.Identity.Infrastructure/Worktandem.Identity.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>
