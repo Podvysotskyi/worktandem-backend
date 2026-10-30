@@ -48,7 +48,7 @@ public class HostTests
     [InlineData("/invitations/accept")]
     public async Task Feature_and_privileged_writes_remain_absent(string path)
     {
-        await AssertNoWrite<Identity.Api.Program>(path, path == "/auth/start" ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.NotFound);
+        await AssertNoWrite<Identity.Api.Program>(path, path is "/auth/start" or "/setup/complete" ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.NotFound);
         await AssertNoWrite<Organization.Api.Program>(path);
         await AssertNoWrite<Gateway.Program>(path);
     }

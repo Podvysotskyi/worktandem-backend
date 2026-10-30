@@ -26,6 +26,13 @@ internal static class GoogleAuthConfiguration
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<IPendingLoginStore, Infrastructure.PostgresPendingLoginStore>();
         services.AddScoped<PendingLoginWorkflow>();
+        services.AddScoped<IAuthenticationTransactions, Infrastructure.PostgresAuthenticationTransactions>();
+        services.AddScoped<ISetupAttemptBudget, Infrastructure.PostgresSetupAttemptBudget>();
+        services.AddSingleton<IBootstrapSecretVerifier, Infrastructure.EnvironmentBootstrapSecretVerifier>();
+        services.AddSingleton<IPrivilegedAssuranceGate>(provider =>
+            new ConfiguredAssuranceGate(provider.GetRequiredService<IConfiguration>()
+                .GetValue<bool>("Worktandem:Google:PrivilegedAssuranceVerified")));
+        services.AddScoped<AuthenticationWorkflow>();
         // A browser container is never an authorized account. Later routes require explicit actor policies.
         services.AddAuthorization(options => options.DefaultPolicy =
             new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
@@ -70,7 +77,11 @@ internal static class GoogleAuthConfiguration
             catch (Exception) { /* Missing/unusable deployment configuration leaves auth unavailable. */ }
         }
         services.AddSingleton<IGoogleAuthAvailability>(new GoogleAuthAvailability(configured));
-        services.AddAuthentication()
+        services.AddAuthentication(options =>
+            {
+                options.DefaultChallengeScheme = RejectScheme;
+                options.DefaultForbidScheme = RejectScheme;
+            })
             .AddScheme<AuthenticationSchemeOptions, RejectInteractiveSignIn>(RejectScheme, _ => { })
             .AddOpenIdConnect(Scheme, options =>
             {
@@ -112,7 +123,8 @@ internal static class GoogleAuthConfiguration
                     },
                     OnRedirectToIdentityProvider = context =>
                     {
-                        if (context.Properties.Items.TryGetValue("wt.purpose", out var purpose) && purpose == "Bootstrap")
+                        if ((context.Properties.Items.TryGetValue("wt.purpose", out var purpose) && purpose == "Bootstrap") ||
+                            (context.Properties.Items.TryGetValue("wt.fresh-assurance", out var fresh) && fresh == "true"))
                         {
                             context.ProtocolMessage.SetParameter("max_age", "300");
                             context.ProtocolMessage.SetParameter("claims", "{\"id_token\":{\"auth_time\":{\"essential\":true},\"amr\":{\"essential\":true}}}");
@@ -128,6 +140,11 @@ internal static class GoogleAuthConfiguration
                 };
             });
     }
+}
+
+internal sealed class ConfiguredAssuranceGate(bool available) : IPrivilegedAssuranceGate
+{
+    public bool IsAvailable => available;
 }
 
 // Receiving the OIDC ticket must go through PendingLogin. No framework auth cookie can accidentally create authority.

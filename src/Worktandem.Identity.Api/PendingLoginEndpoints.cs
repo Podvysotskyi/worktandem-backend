@@ -7,13 +7,14 @@ namespace Worktandem.Identity.Api;
 
 internal static class PendingLoginEndpoints
 {
-    private sealed record StartRequest(string Purpose, string ReturnPath);
+    private sealed record StartRequest(string Purpose, string ReturnPath, bool RequireFreshMfa = false);
 
     public static void UsePendingGoogleLogin(this WebApplication app)
     {
         app.Use(async (context, next) =>
         {
-            if (context.Request.Path.StartsWithSegments("/auth") || context.Request.Path == GoogleAuthConfiguration.Callback)
+            if (context.Request.Path.StartsWithSegments("/auth") || context.Request.Path.StartsWithSegments("/setup") ||
+                context.Request.Path.StartsWithSegments("/session") || context.Request.Path == GoogleAuthConfiguration.Callback)
             {
                 AuthHttp.NoStore(context);
                 if (!context.RequestServices.GetRequiredService<IGoogleAuthAvailability>().IsConfigured)
@@ -64,6 +65,7 @@ internal static class PendingLoginEndpoints
                 properties.Items["wt.flow"] = flow.ToString("D");
                 properties.Items["wt.browser"] = digest;
                 properties.Items["wt.purpose"] = purpose.ToString();
+                if (request.RequireFreshMfa) properties.Items["wt.fresh-assurance"] = "true";
                 await context.ChallengeAsync(GoogleAuthConfiguration.Scheme, properties);
             }
             catch (LoginFlowException failure)

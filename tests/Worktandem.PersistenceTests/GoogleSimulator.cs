@@ -35,7 +35,8 @@ internal sealed class GoogleSimulator : HttpMessageHandler
 
     public sealed record TokenCase(string Issuer = "https://accounts.google.com", string Audience = "fixture-client",
         string Subject = "fixture-subject", bool Expired = false, bool WrongNonce = false,
-        bool MissingNonce = false, bool WrongSignature = false, bool Mfa = true, bool StaleAuthTime = false);
+        bool MissingNonce = false, bool WrongSignature = false, bool Mfa = true, bool StaleAuthTime = false,
+        DateTimeOffset? AuthenticatedAt = null, bool MissingAuthTime = false);
 
     private sealed record Code(string Challenge, string Nonce, TokenCase Token);
 
@@ -65,8 +66,9 @@ internal sealed class GoogleSimulator : HttpMessageHandler
             ["sub"] = code.Token.Subject,
             ["email"] = "same-mutable-mailbox@example.invalid",
             ["email_verified"] = true,
-            ["auth_time"] = DateTimeOffset.UtcNow.AddMinutes(code.Token.StaleAuthTime ? -10 : -1).ToUnixTimeSeconds()
+            ["auth_time"] = (code.Token.AuthenticatedAt ?? DateTimeOffset.UtcNow.AddMinutes(code.Token.StaleAuthTime ? -10 : -1)).ToUnixTimeSeconds()
         };
+        if (code.Token.MissingAuthTime) claims.Remove("auth_time");
         if (!code.Token.MissingNonce) claims["nonce"] = code.Token.WrongNonce ? "incorrect-nonce" : code.Nonce;
         if (code.Token.Mfa) claims["amr"] = new[] { "mfa" };
         LastIdToken = new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor

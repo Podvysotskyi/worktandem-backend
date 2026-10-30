@@ -1,12 +1,12 @@
 # Worktandem backend
 
-.NET 10 / ASP.NET Core persistence foundation plus a bounded Google OIDC/PendingLogin
-handshake. Permanent account login, bootstrap completion, authorization and business workflows
-remain disabled. See [implemented authentication scope](docs/authentication.md).
+.NET 10 / ASP.NET Core persistence, Google OIDC, protected bootstrap and server account sessions.
+The backend workflows are tested with an isolated provider; live Google and deployment integration
+remain prerequisites. See [implemented authentication scope](docs/authentication.md).
 
 The scope follows [implementation-readiness docs PR #7](https://github.com/Podvysotskyi/worktandem-docs/pull/7)
 ([merged immutable design](https://github.com/Podvysotskyi/worktandem-docs/blob/f9acaa0e0b596ee452e5daa0e7fa75e4c9e2e70f/docs/implementation/readiness.md)).
-The first persistence milestone is merged; the authentication handshake is a partial PR2 deliverable.
+The persistence and handshake milestones are merged; this increment completes backend bootstrap/sessions.
 
 ## Build and test
 
@@ -39,6 +39,10 @@ dotnet run --project src/Worktandem.Organization.Api -- --urls http://localhost:
 dotnet run --project src/Worktandem.Gateway -- --urls http://localhost:5100 --environment Development
 ```
 
+These HTTP commands support probes/development OpenAPI. Authentication requires a separately
+configured HTTPS listener and existing certificates/client configuration described in
+[authentication](docs/authentication.md); this repository does not provision them.
+
 All expose /health/live (process only). Identity/Organization /health/ready returns 503
 without its service connection string, database connectivity or all migrations; it returns
 200 after those checks pass. Gateway has no external dependencies and its readiness remains
@@ -65,12 +69,12 @@ Only Identity's incomplete setup singleton is seeded.
   Application has no use cases yet; Infrastructure owns its context and migration sources.
 - Gateway remains a separate stateless BFF scaffold with no persistence/service references.
 
-Identity exposes configured HTTPS auth/context, auth/start, signin-google callback and
-browser-owned pending-proof lookup. These create no permanent account or session.
-There are no setup-completion, session, company, review, status-write or invitation endpoints.
-Do not expose this foundation as a working production application. The next slice completes
-protected bootstrap and server sessions. Privileged assurance, recovery/last-owner coordination
-and invitation mailbox proof remain gated by the design.
+Identity exposes configured HTTPS sign-in/bootstrap completion, explicit account-session context,
+logout and a certificate-authenticated internal authority contract. No company, review,
+public status-write or invitation endpoint exists. Privileged bootstrap/authority require
+validated fresh MFA plus the explicit deployment assurance gate.
+Do not expose this as a production-ready application: real Google/PKI integration, deployment,
+owner/recovery policy, tenant workflows and client switching/cache UX remain separate work.
 
 Publish/deploy executable hosts independently using dotnet publish <project> -c Release.
 Container packaging and production deployment remain separate work.

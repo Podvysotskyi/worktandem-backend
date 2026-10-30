@@ -11,6 +11,7 @@ public sealed class PendingLogin(Guid id, Guid browserSessionId, LoginPurpose pu
     public DateTimeOffset CreatedAt { get; private set; } = createdAt;
     public DateTimeOffset ExpiresAt { get; private set; } = expiresAt;
     public DateTimeOffset? ValidatedAt { get; private set; }
+    public DateTimeOffset? ConsumedAt { get; private set; }
     public string? Issuer { get; private set; }
     public string? Subject { get; private set; }
     public string? Email { get; private set; }
@@ -19,6 +20,14 @@ public sealed class PendingLogin(Guid id, Guid browserSessionId, LoginPurpose pu
     public DateTimeOffset? ProviderAuthenticatedAt { get; private set; }
     public bool MfaObserved { get; private set; }
     public Guid Version { get; private set; } = version;
+
+    public void Consume(DateTimeOffset now)
+    {
+        if (ValidatedAt is null || ConsumedAt is not null || ExpiresAt <= now)
+            throw new InvalidOperationException("Login proof is unavailable.");
+        ConsumedAt = now;
+        Version = Guid.CreateVersion7();
+    }
 
     public void RecordValidatedProof(GoogleLoginEvidence evidence, DateTimeOffset now)
     {

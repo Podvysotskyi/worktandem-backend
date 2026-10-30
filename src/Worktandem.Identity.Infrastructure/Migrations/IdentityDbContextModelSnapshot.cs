@@ -29,6 +29,10 @@ namespace Worktandem.Identity.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTimeOffset?>("AuthenticationRevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("authentication_revoked_at");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -88,6 +92,10 @@ namespace Worktandem.Identity.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("browser_session_id");
 
+                    b.Property<DateTimeOffset?>("EvidenceObservedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("evidence_observed_at");
+
                     b.Property<DateTimeOffset>("ExpiresAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at");
@@ -103,6 +111,14 @@ namespace Worktandem.Identity.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("LastSeenAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_seen_at");
+
+                    b.Property<bool>("MfaObserved")
+                        .HasColumnType("boolean")
+                        .HasColumnName("mfa_observed");
+
+                    b.Property<DateTimeOffset?>("ProviderAuthenticatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("provider_authenticated_at");
 
                     b.Property<DateTimeOffset?>("RevokedAt")
                         .HasColumnType("timestamp with time zone")
@@ -124,6 +140,11 @@ namespace Worktandem.Identity.Infrastructure.Migrations
 
                     b.HasIndex("AccountId", "RevokedAt")
                         .HasDatabaseName("ix_account_sessions_account_id_revoked_at");
+
+                    b.HasIndex("BrowserSessionId", "AccountId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_account_sessions_browser_session_id_account_id")
+                        .HasFilter("revoked_at IS NULL");
 
                     b.HasIndex("BrowserSessionId", "RevokedAt")
                         .HasDatabaseName("ix_account_sessions_browser_session_id_revoked_at");
@@ -199,6 +220,60 @@ namespace Worktandem.Identity.Infrastructure.Migrations
                             t.HasCheckConstraint("ck_status_transition", "previous_status IN ('Active', 'Suspended', 'Closed') AND new_status IN ('Active', 'Suspended', 'Closed') AND previous_status <> new_status AND expected_account_version <> result_account_version");
 
                             t.HasCheckConstraint("ck_suspension_reason", "new_status <> 'Suspended' OR (reason IS NOT NULL AND length(btrim(reason, E' \\t\\n\\r')) > 0)");
+                        });
+                });
+
+            modelBuilder.Entity("Worktandem.Identity.Domain.AuthenticationAudit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActorAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_account_id");
+
+                    b.Property<Guid>("BrowserSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("browser_session_id");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<string>("EventName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("event_name");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid?>("PendingLoginId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pending_login_id");
+
+                    b.Property<Guid>("ResultVersion")
+                        .HasColumnType("uuid")
+                        .HasColumnName("result_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_authentication_audit_id");
+
+                    b.HasIndex("BrowserSessionId")
+                        .HasDatabaseName("ix_authentication_audit_browser_session_id");
+
+                    b.HasIndex("ActorAccountId", "OccurredAt", "Id")
+                        .HasDatabaseName("ix_authentication_audit_actor_account_id_occurred_at_id");
+
+                    b.ToTable("authentication_audit", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_auth_audit_event", "event_name IN ('bootstrap.completed', 'account.registered', 'session.created', 'session.logged_out', 'container.logged_out', 'authority.validated')");
                         });
                 });
 
@@ -340,6 +415,10 @@ namespace Worktandem.Identity.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("browser_session_id");
 
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed_at");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -413,6 +492,8 @@ namespace Worktandem.Identity.Infrastructure.Migrations
 
                     b.ToTable("pending_logins", null, t =>
                         {
+                            t.HasCheckConstraint("ck_pending_consumption", "consumed_at IS NULL OR (validated_at IS NOT NULL AND consumed_at >= validated_at AND consumed_at < expires_at)");
+
                             t.HasCheckConstraint("ck_pending_evidence", "(validated_at IS NULL AND issuer IS NULL AND subject IS NULL AND email IS NULL AND hosted_domain IS NULL AND provider_authenticated_at IS NULL AND NOT mfa_observed AND NOT email_verified) OR (validated_at IS NOT NULL AND issuer IS NOT NULL AND issuer = 'https://accounts.google.com' AND subject IS NOT NULL AND length(subject) > 0)");
 
                             t.HasCheckConstraint("ck_pending_lifetime", "expires_at > created_at AND (validated_at IS NULL OR validated_at >= created_at)");
@@ -470,6 +551,55 @@ namespace Worktandem.Identity.Infrastructure.Migrations
                     b.ToTable("platform_grants", null, t =>
                         {
                             t.HasCheckConstraint("ck_grant_revocation", "(revoked_at IS NULL AND revoked_by_account_id IS NULL) OR (revoked_at IS NOT NULL AND revoked_at >= granted_at AND revoked_by_account_id IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Worktandem.Identity.Domain.SetupAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("IsFailure")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_failure");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("PendingLoginId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pending_login_id");
+
+                    b.Property<string>("SourceHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("source_hash")
+                        .UseCollation("C");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_setup_attempts_id");
+
+                    b.HasIndex("OccurredAt")
+                        .HasDatabaseName("ix_setup_attempts_occurred_at");
+
+                    b.HasIndex("PendingLoginId", "OccurredAt")
+                        .HasDatabaseName("ix_setup_attempts_pending_login_id_occurred_at");
+
+                    b.HasIndex("SourceHash", "OccurredAt")
+                        .HasDatabaseName("ix_setup_attempts_source_hash_occurred_at");
+
+                    b.ToTable("setup_attempts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_attempt_source", "source_hash ~ '^[0-9a-f]{64}$'");
                         });
                 });
 
@@ -554,6 +684,22 @@ namespace Worktandem.Identity.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_account_status_transitions_actor_account_id");
+                });
+
+            modelBuilder.Entity("Worktandem.Identity.Domain.AuthenticationAudit", b =>
+                {
+                    b.HasOne("Worktandem.Identity.Domain.Account", null)
+                        .WithMany()
+                        .HasForeignKey("ActorAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_authentication_audit_actor_account_id");
+
+                    b.HasOne("Worktandem.Identity.Domain.BrowserSession", null)
+                        .WithMany()
+                        .HasForeignKey("BrowserSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_authentication_audit_browser_session_id");
                 });
 
             modelBuilder.Entity("Worktandem.Identity.Domain.ExternalIdentity", b =>

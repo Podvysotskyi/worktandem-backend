@@ -95,7 +95,7 @@ public sealed class GoogleLoginTests(PostgresFixture postgres)
         using var foreignRead = await stranger.GetAsync("/auth/pending/" + pending.Id);
         Assert.Equal(HttpStatusCode.NotFound, foreignRead.StatusCode);
         using var prohibited = await browser.PostAsJsonAsync("/setup/complete", new { pendingLoginId = pending.Id, secret = "fixture-never-processed" });
-        Assert.Equal(HttpStatusCode.NotFound, prohibited.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, prohibited.StatusCode);
         // A copied/replayed callback cannot create another proof or account.
         using var replay = await browser.GetAsync(Callback(url, code));
         Assert.Equal(HttpStatusCode.BadRequest, replay.StatusCode);
@@ -158,7 +158,7 @@ public sealed class GoogleLoginTests(PostgresFixture postgres)
         Assert.False(pending.MfaObserved);
         Assert.True(pending.ProviderAuthenticatedAt < host.Clock.GetUtcNow().AddMinutes(-5));
         using var complete = await browser.PostAsJsonAsync("/setup/complete", new { pendingLoginId = pending.Id });
-        Assert.Equal(HttpStatusCode.NotFound, complete.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, complete.StatusCode);
         Assert.Empty(await db.Set<Account>().ToListAsync());
         Assert.Empty(await db.Set<AccountSession>().ToListAsync());
         Assert.Empty(await db.Set<PlatformGrant>().ToListAsync());
@@ -314,6 +314,6 @@ public sealed class GoogleLoginTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.ServiceUnavailable, unavailable.StatusCode);
         Assert.Empty(unavailable.Headers.TryGetValues("Set-Cookie", out var cookies) ? cookies : []);
         using var setup = await browser.PostAsJsonAsync("/setup/complete", new { });
-        Assert.Equal(HttpStatusCode.NotFound, setup.StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, setup.StatusCode);
     }
 }

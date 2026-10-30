@@ -21,6 +21,8 @@ IdentityDbContext owns accounts, external_identities, setup_state, platform_gran
 browser_sessions, account_sessions and account_status_transitions.
 The subsequent [bounded authentication subset](authentication.md) adds pending_logins for
 browser-bound temporary flow/proof evidence; its migration changes no Organization tables.
+The completion increment adds consumed proof, session assurance, account authentication cutoff,
+one live session per account/container, immutable authentication_audit and transient setup_attempts.
 
 - Case-sensitive canonical issuer + subject is globally unique. Current scope requires
   Google and canonical https://accounts.google.com. A partial unique AccountId index applies
@@ -97,7 +99,7 @@ failure, reason/history integrity, first-owner row-lock contention and rollback,
 closure and readiness with/without migrations. Fixtures produce only synthetic records and use
 no Google client or live bootstrap secret.
 
-These foundation tests do not establish working account login, MFA, bootstrap validation,
-company approval, session authorization, invitation acceptance or production permission separation.
-The bounded authentication subset adds actual framework OIDC/PendingLogin simulator tests;
-account/session/bootstrap completion and all business routes remain absent.
+The authentication suite adds actual framework OIDC, bootstrap, account-session and certificate
+handler tests against this database. It does not establish live Google/MFA or deployed TLS,
+company authorization, invitation acceptance or production database permission separation.
+Company and public global-status workflows remain absent.

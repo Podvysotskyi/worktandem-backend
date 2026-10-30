@@ -2,6 +2,12 @@
   "version": 1,
   "dependencies": {
     "net10.0": {
+      "Microsoft.AspNetCore.Authentication.Certificate": {
+        "type": "Direct",
+        "requested": "[10.0.14, )",
+        "resolved": "10.0.14",
+        "contentHash": "jgKmbW6WLBnM6RWcEPQcEP4/jDjXUwNwSyjtfaNhBGemAVKpmPhQnjbGHkSs8QTnxmiSzsyFOhr1ehTJL36tyg=="
+      },
       "Microsoft.AspNetCore.Authentication.OpenIdConnect": {
         "type": "Direct",
         "requested": "[10.0.14, )",

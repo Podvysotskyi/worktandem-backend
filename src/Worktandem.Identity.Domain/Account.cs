@@ -9,6 +9,15 @@ public sealed class Account(Guid id, string displayName, AccountStatus status, G
     public DateTimeOffset CreatedAt { get; private set; } = createdAt;
     public DateTimeOffset UpdatedAt { get; private set; } = updatedAt;
     public Guid Version { get; private set; } = version;
+    public DateTimeOffset? AuthenticationRevokedAt { get; private set; }
+
+    // Trusted status workflows must call this and revoke sessions in their owning transaction.
+    public void InvalidateAuthentication(DateTimeOffset now)
+    {
+        AuthenticationRevokedAt = now;
+        UpdatedAt = now;
+        Version = Guid.CreateVersion7();
+    }
 
     public void Rename(string displayName)
     {

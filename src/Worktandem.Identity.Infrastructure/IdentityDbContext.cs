@@ -69,6 +69,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         session.HasIndex(x => new { x.AccountId, x.RevokedAt });
         session.HasIndex(x => new { x.BrowserSessionId, x.RevokedAt });
         session.HasIndex(x => x.ExpiresAt);
+        session.HasIndex(x => new { x.BrowserSessionId, x.AccountId }).IsUnique().HasFilter("revoked_at IS NULL");
 
         var transition = model.Entity<AccountStatusTransition>();
         transition.ToTable("account_status_transitions", t =>
@@ -88,6 +89,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         var pending = model.Entity<PendingLogin>();
         pending.ToTable("pending_logins", t =>
         {
+            t.HasCheckConstraint("ck_pending_consumption", "consumed_at IS NULL OR (validated_at IS NOT NULL AND consumed_at >= validated_at AND consumed_at < expires_at)");
             t.HasCheckConstraint("ck_pending_purpose", "purpose IN ('Bootstrap', 'Login', 'Register', 'AddAccount')");
             t.HasCheckConstraint("ck_pending_lifetime", "expires_at > created_at AND (validated_at IS NULL OR validated_at >= created_at)");
             t.HasCheckConstraint("ck_pending_return", "return_path IN ('/', '/setup', '/auth/continue')");
@@ -102,6 +104,22 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         pending.HasOne<BrowserSession>().WithMany().HasForeignKey(x => x.BrowserSessionId).OnDelete(DeleteBehavior.Restrict);
         pending.HasIndex(x => new { x.BrowserSessionId, x.ExpiresAt });
         pending.HasIndex(x => x.ExpiresAt);
+
+        var audit = model.Entity<AuthenticationAudit>();
+        audit.ToTable("authentication_audit", t =>
+            t.HasCheckConstraint("ck_auth_audit_event", "event_name IN ('bootstrap.completed', 'account.registered', 'session.created', 'session.logged_out', 'container.logged_out', 'authority.validated')"));
+        audit.Property(x => x.EventName).HasMaxLength(64);
+        audit.Property(x => x.CorrelationId).HasMaxLength(100);
+        audit.HasOne<Account>().WithMany().HasForeignKey(x => x.ActorAccountId).OnDelete(DeleteBehavior.Restrict);
+        audit.HasOne<BrowserSession>().WithMany().HasForeignKey(x => x.BrowserSessionId).OnDelete(DeleteBehavior.Restrict);
+        audit.HasIndex(x => new { x.ActorAccountId, x.OccurredAt, x.Id });
+
+        var attempts = model.Entity<SetupAttempt>();
+        attempts.ToTable("setup_attempts", t => t.HasCheckConstraint("ck_attempt_source", "source_hash ~ '^[0-9a-f]{64}$'"));
+        attempts.Property(x => x.SourceHash).HasMaxLength(64).UseCollation("C");
+        attempts.HasIndex(x => x.OccurredAt);
+        attempts.HasIndex(x => new { x.PendingLoginId, x.OccurredAt });
+        attempts.HasIndex(x => new { x.SourceHash, x.OccurredAt });
 
         // Service-local relational naming. No cross-service entity registration or shared model.
         foreach (var entity in model.Model.GetEntityTypes())
