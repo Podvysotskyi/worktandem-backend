@@ -8,6 +8,10 @@ public partial class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+        builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Warning);
+        builder.Services.AddHttpClient(BrowserProxy.ClientName, client => client.Timeout = Timeout.InfiniteTimeSpan)
+            .RemoveAllLoggers().ConfigurePrimaryHttpMessageHandler(BrowserProxy.Handler);
+        builder.Services.AddSingleton<BrowserProxy>();
         builder.Services.AddOpenApi();
         builder.Services.AddHealthChecks()
             .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["ready"]);
@@ -26,7 +30,10 @@ public partial class Program
             Predicate = registration => registration.Tags.Contains("ready")
         });
         
-        // Intentionally no business routes until authentication and scoped authorization exist.
+        // Do not expose arbitrary downstream paths, internal authority, probes or future writes.
+        app.MapMethods("/api/{**path}", ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+            (HttpContext context, BrowserProxy proxy) => proxy.Forward(context));
+        app.MapGet("/signin-google", (HttpContext context, BrowserProxy proxy) => proxy.Forward(context));
         app.Run();
     }
 }

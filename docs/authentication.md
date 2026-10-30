@@ -4,7 +4,7 @@ The backend authentication workflows in [readiness PR2](https://github.com/Podvy
 are implemented and tested with an isolated provider and PostgreSQL. Live Google client/claims,
 deployment certificates, ingress and shared-key configuration remain unverified prerequisites.
 Backend [company onboarding/review](company-onboarding.md) consumes these contracts;
-frontend account/company switching and gateway binding remain later integration work.
+the [Gateway](gateway.md) exposes the browser HTTP contracts with explicit service prefixes.
 
 ## HTTP contracts
 

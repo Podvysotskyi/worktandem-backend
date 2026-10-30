@@ -53,6 +53,95 @@ public sealed class GoogleLoginTests(PostgresFixture postgres)
         return (connection, new GoogleTestHost(connection));
     }
 
+    [Theory]
+    [InlineData(false, false, 400)]
+    [InlineData(false, true, 302)]
+    [InlineData(true, false, 503)]
+    [InlineData(true, true, 302)]
+    public async Task Validated_callback_workflow_failure_uses_browser_recovery_and_preserves_api_status(bool databaseUnavailable, bool html, int expected)
+    {
+        var (connection, host) = await Host(); await using var dispose = host;
+        using var browser = host.Browser();
+        using var challenge = await Start(browser, await Token(browser));
+        Assert.Equal(HttpStatusCode.Redirect, challenge.StatusCode);
+        var url = challenge.Headers.Location!;
+        var code = host.Provider.IssueCode(url);
+        if (databaseUnavailable) await postgres.DropOwnedDatabase(connection);
+        else host.Clock.Advance(TimeSpan.FromMinutes(6));
+        using var request = new HttpRequestMessage(HttpMethod.Get, Callback(url, code));
+        request.Headers.Add("Accept", html ? "text/html" : "application/json");
+        using var response = await browser.SendAsync(request);
+        Assert.Equal(expected, (int)response.StatusCode);
+        Assert.Equal(html ? "/auth/continue?error=invalid_google_login" : null, response.Headers.Location?.OriginalString);
+        if (!html)
+        {
+            var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal(databaseUnavailable ? "identity_unavailable" : "invalid_google_login", payload.GetProperty("code").GetString());
+        }
+        Assert.DoesNotContain(code, await response.Content.ReadAsStringAsync());
+        Assert.NotEmpty(host.Provider.LastVerifier!); // The framework validated the provider first.
+    }
+
+    [Theory]
+    [InlineData("text/html", 302)]
+    [InlineData("application/json", 400)]
+    [InlineData("text/html;q=0", 400)]
+    [InlineData("invalid-accept", 400)]
+    public async Task Callback_failure_uses_a_fixed_browser_recovery_route_without_echoing_provider_input(string accept, int expected)
+    {
+        var (_, host) = await Host(); await using var dispose = host;
+        using var browser = host.Browser();
+        using var request = new HttpRequestMessage(HttpMethod.Get,
+            "/signin-google?code=secret-code-fixture&state=secret-state-fixture&error=provider-fixture&error_description=sensitive-description-fixture");
+        request.Headers.TryAddWithoutValidation("Accept", accept);
+        using var response = await browser.SendAsync(request);
+        Assert.Equal(expected, (int)response.StatusCode);
+        Assert.Equal(expected == 302 ? "/auth/continue?error=invalid_google_login" : null, response.Headers.Location?.OriginalString);
+        Assert.Equal("no-store", response.Headers.CacheControl!.ToString());
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("fixture", body);
+        Assert.DoesNotContain("fixture", response.Headers.Location?.OriginalString ?? "");
+    }
+
+    [Theory]
+    [InlineData("application/json", true)]
+    [InlineData("text/html, application/json;q=0.8", true)]
+    [InlineData("application/json;q=0", false)]
+    [InlineData("invalid-accept", false)]
+    public async Task Challenge_negotiation_preserves_framework_state_correlation_pkce_and_callback_validation(string accept, bool json)
+    {
+        var (_, host) = await Host(); await using var dispose = host;
+        using var browser = host.Browser();
+        var token = await Token(browser);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/auth/start")
+        { Content = JsonContent.Create(new { purpose = "Bootstrap", returnPath = "/setup" }) };
+        request.Headers.Add("X-WT-CSRF", token);
+        request.Headers.Add("Origin", "https://localhost");
+        request.Headers.TryAddWithoutValidation("Accept", accept);
+        using var challenge = await browser.SendAsync(request);
+        Assert.Equal(json ? HttpStatusCode.OK : HttpStatusCode.Redirect, challenge.StatusCode);
+        Assert.Equal("no-store", challenge.Headers.CacheControl!.ToString());
+        Assert.True(challenge.Headers.GetValues("Set-Cookie").Count() >= 2);
+        var url = challenge.Headers.Location;
+        if (json)
+        {
+            Assert.Null(url);
+            var payload = await challenge.Content.ReadFromJsonAsync<JsonElement>();
+            url = new Uri(payload.GetProperty("authorizationUrl").GetString()!);
+        }
+        Assert.NotNull(url);
+        Assert.Equal("https://accounts.google.com", url.GetLeftPart(UriPartial.Authority));
+        var query = QueryHelpers.ParseQuery(url.Query);
+        Assert.NotEmpty(query["state"].ToString());
+        Assert.NotEmpty(query["nonce"].ToString());
+        Assert.Equal("S256", query["code_challenge_method"]);
+        Assert.Equal("https://localhost/signin-google", query["redirect_uri"]);
+        using var callback = await browser.GetAsync(Callback(url, host.Provider.IssueCode(url)));
+        Assert.Equal(HttpStatusCode.Redirect, callback.StatusCode);
+        Assert.StartsWith("/setup?pendingLogin=", callback.Headers.Location!.OriginalString);
+        Assert.NotEmpty(host.Provider.LastVerifier!);
+    }
+
     [Fact]
     public async Task Framework_code_flow_uses_pkce_and_stores_only_browser_bound_temporary_proof()
     {

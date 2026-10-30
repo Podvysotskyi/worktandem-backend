@@ -51,7 +51,7 @@ internal static class GoogleProofCallback
                 .LogWarning("Google proof rejected ({Category})",
                     failure is LoginFlowException flow ? flow.Code : failure.GetType().Name);
             var unavailable = failure is System.Data.Common.DbException or Microsoft.EntityFrameworkCore.DbUpdateException;
-            await AuthHttp.Problem(http, unavailable ? 503 : 400, unavailable ? "identity_unavailable" : "invalid_google_login");
+            await AuthHttp.CallbackFailure(http, unavailable ? 503 : 400, unavailable ? "identity_unavailable" : "invalid_google_login");
         }
     }
 

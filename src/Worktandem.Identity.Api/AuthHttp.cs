@@ -79,6 +79,19 @@ internal static class AuthHttp
             ["correlationId"] = context.TraceIdentifier
         }).ExecuteAsync(context);
 
+    public static bool Accepts(HttpContext context, string mediaType) =>
+        Microsoft.Net.Http.Headers.MediaTypeHeaderValue.TryParseList(
+            context.Request.Headers.Accept.Where(value => value is not null).Select(value => value!).ToArray(), out var accepted) &&
+        accepted.Any(value => value.MediaType.Equals(mediaType, StringComparison.OrdinalIgnoreCase) && value.Quality is not 0);
+
+    public static Task CallbackFailure(HttpContext context, int status, string code)
+    {
+        if (!Accepts(context, "text/html")) return Problem(context, status, code);
+        // Provider payloads and arbitrary destinations never enter this fixed recovery URL.
+        context.Response.Redirect("/auth/continue?error=invalid_google_login");
+        return Task.CompletedTask;
+    }
+
     public static void NoStore(HttpContext context)
     {
         context.Response.Headers.CacheControl = "no-store";

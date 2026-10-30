@@ -8,7 +8,8 @@ Google/mutual-TLS integration is included.
 ## Browser integration
 
 Expose Identity and Organization through the same HTTPS origin using explicit gateway/ingress
-routes. Gateway routing is still a scaffold and must be wired before UI integration.
+routes. The [Gateway transport](gateway.md) exposes `/api/identity` and `/api/organization`
+prefixes; the endpoint paths below are the downstream paths after prefix removal.
 Forward the opaque `__Host-wt-browser` cookie and explicit per-tab `X-WT-Account-Session` selector.
 Never send account IDs, roles, email or platform capabilities as authority headers.
 Organization gets the current actor from Identity on every protected request; its own
@@ -149,7 +150,8 @@ Tests cover creation retry/races, rejection/resubmission, superseded/stale/dupli
 rollback, independent owner activation, tenant/session isolation, revoked grants, assurance and
 authority failure, stored suspension/permission denial and unrelated memberships.
 
-Nuxt forms/status/platform queue, selector/cache UX and gateway routing are next integration
-work. Invitations/mailbox proof, directory sync, optional Google APIs, CRM modules, public global
+Nuxt forms/status/platform queue and selector/cache UX consume these contracts through the
+Gateway; their validation is owned by the frontend repository. Invitations/mailbox proof,
+directory sync, optional Google APIs, CRM modules, public global
 status/removal, ownership recovery and last-owner mutation policy remain closed. Live Google,
 PKI/ingress, retention/backups and production readiness are not claimed.

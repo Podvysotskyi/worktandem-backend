@@ -5,6 +5,7 @@ company application/review and workspace authorization.
 The backend workflows are tested with an isolated provider; live Google and deployment integration
 remain prerequisites. See [implemented authentication scope](docs/authentication.md).
 See [company onboarding contracts and frontend integration](docs/company-onboarding.md).
+See [browser Gateway routes and HTTPS prerequisites](docs/gateway.md).
 
 The scope follows [implementation-readiness docs PR #7](https://github.com/Podvysotskyi/worktandem-docs/pull/7)
 ([merged immutable design](https://github.com/Podvysotskyi/worktandem-docs/blob/f9acaa0e0b596ee452e5daa0e7fa75e4c9e2e70f/docs/implementation/readiness.md)).
@@ -47,8 +48,8 @@ configured HTTPS listener and existing certificates/client configuration describ
 
 All expose /health/live (process only). Identity/Organization /health/ready returns 503
 without its service connection string, database connectivity or all migrations; it returns
-200 after those checks pass. Gateway has no external dependencies and its readiness remains
-process-only. Probes return no provider details. Readiness does not establish Google,
+200 after those checks pass. Gateway readiness remains process-only and does not probe its
+configured service origins. Probes return no provider details. Readiness does not establish Google,
 session, tenant authorization or production readiness. Development only: /openapi/v1.json.
 
 Use normal ASP.NET configuration providers: ConnectionStrings__Identity and
@@ -69,7 +70,7 @@ Only Identity's incomplete setup singleton is seeded.
 - Organization owns company/application/review records, memberships and company-scoped RBAC.
 - Each service has Domain, Application, Infrastructure and Api projects. Domain is framework-free;
   Application owns authentication or company use cases; Infrastructure owns its context and migration sources.
-- Gateway remains a separate stateless BFF scaffold with no persistence/service references.
+- Gateway forwards an explicit browser route allowlist with no persistence/service references.
 
 Identity exposes configured HTTPS sign-in/bootstrap completion, explicit account-session context,
 logout, restricted reviewer provisioning and a certificate-authenticated internal authority contract.
@@ -77,7 +78,7 @@ Organization implements Pending application, independent review and explicit com
 No public status-write or invitation endpoint exists. Privileged bootstrap/authority require
 validated fresh MFA plus the explicit deployment assurance gate.
 Do not expose this as a production-ready application: real Google/PKI integration, deployment,
-owner/recovery policy, gateway/UI binding and client switching/cache UX remain separate work.
+owner/recovery policy and deployed UI/proxy configuration remain separate work.
 
 Publish/deploy executable hosts independently using dotnet publish <project> -c Release.
 Container packaging and production deployment remain separate work.
