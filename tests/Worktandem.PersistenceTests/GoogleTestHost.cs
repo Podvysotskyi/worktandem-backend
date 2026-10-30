@@ -47,6 +47,7 @@ internal sealed class GoogleTestHost(string connection, bool enableCompletion = 
     public FixtureAssurance Assurance { get; } = new() { IsAvailable = enableCompletion };
     public RollbackBootstrapInterceptor Rollback { get; } = new();
     public FixtureCertificates Certificates { get; } = new();
+    public bool RuntimeAvailable { get; set; } = true;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -66,7 +67,7 @@ internal sealed class GoogleTestHost(string connection, bool enableCompletion = 
             services.RemoveAll<IDataProtectionProvider>();
             services.AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvider());
             services.RemoveAll<IGoogleAuthAvailability>();
-            services.AddSingleton<IGoogleAuthAvailability>(new Available());
+            services.AddSingleton<IGoogleAuthAvailability>(new Available(this));
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Clock);
             services.RemoveAll<IBootstrapSecretVerifier>();
@@ -103,7 +104,7 @@ internal sealed class GoogleTestHost(string connection, bool enableCompletion = 
         Provider.Dispose();
         Certificates.Dispose();
     }
-    private sealed class Available : IGoogleAuthAvailability { public bool IsConfigured => true; }
+    private sealed class Available(GoogleTestHost host) : IGoogleAuthAvailability { public bool IsConfigured => host.RuntimeAvailable; }
 
     public HttpClient Browser(bool cookies = true) => CreateClient(new WebApplicationFactoryClientOptions
     {

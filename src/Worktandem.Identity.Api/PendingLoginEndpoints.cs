@@ -14,6 +14,7 @@ internal static class PendingLoginEndpoints
         app.Use(async (context, next) =>
         {
             if (context.Request.Path.StartsWithSegments("/auth") || context.Request.Path.StartsWithSegments("/setup") ||
+                context.Request.Path.StartsWithSegments("/account/company-operation") || context.Request.Path.StartsWithSegments("/platform/reviewer-grants") ||
                 context.Request.Path.StartsWithSegments("/session") || context.Request.Path == GoogleAuthConfiguration.Callback)
             {
                 AuthHttp.NoStore(context);

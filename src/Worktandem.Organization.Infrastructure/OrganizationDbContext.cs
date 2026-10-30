@@ -87,6 +87,23 @@ public sealed class OrganizationDbContext(DbContextOptions<OrganizationDbContext
         assignment.HasOne<CompanyMembership>().WithMany().HasForeignKey(x => new { x.CompanyId, x.MembershipId }).HasPrincipalKey(x => new { x.CompanyId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         assignment.HasOne<CompanyRole>().WithMany().HasForeignKey(x => new { x.CompanyId, x.RoleId }).HasPrincipalKey(x => new { x.CompanyId, x.Id }).OnDelete(DeleteBehavior.Restrict);
 
+        var receipt = model.Entity<OperationReceipt>();
+        receipt.ToTable("operation_receipts");
+        receipt.HasKey(x => new { x.ActorAccountId, x.Operation, x.TargetId, x.Key });
+        receipt.Property(x => x.Operation).HasMaxLength(32);
+        receipt.Property(x => x.Key).HasMaxLength(100).UseCollation("C");
+        receipt.Property(x => x.PayloadHash).HasMaxLength(64);
+        receipt.Property(x => x.ResultJson).HasColumnType("jsonb");
+        receipt.HasIndex(x => x.ExpiresAt);
+
+        var audit = model.Entity<CompanyAudit>();
+        audit.ToTable("company_audit");
+        audit.Property(x => x.EventName).HasMaxLength(64);
+        audit.Property(x => x.CorrelationId).HasMaxLength(100);
+        audit.HasOne<CompanyApplication>().WithMany().HasForeignKey(x => new { x.CompanyId, x.ApplicationId })
+            .HasPrincipalKey(x => new { x.CompanyId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        audit.HasIndex(x => new { x.CompanyId, x.OccurredAt, x.Id });
+
         // Service-local relational naming. No cross-service entity registration or shared model.
         foreach (var entity in model.Model.GetEntityTypes())
         {

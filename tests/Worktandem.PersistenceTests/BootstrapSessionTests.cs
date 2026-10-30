@@ -17,7 +17,7 @@ namespace Worktandem.PersistenceTests;
 [Collection("postgres")]
 public sealed class BootstrapSessionTests(PostgresFixture postgres)
 {
-    private sealed class Browser(GoogleTestHost host) : IDisposable
+    internal sealed class Browser(GoogleTestHost host) : IDisposable
     {
         public HttpClient Client { get; } = host.Browser();
         public string Credential { get; private set; } = "";
@@ -106,7 +106,7 @@ public sealed class BootstrapSessionTests(PostgresFixture postgres)
         return (connection, new GoogleTestHost(connection, enableCompletion: true));
     }
 
-    private static async Task<SessionIdentity> Owner(Browser browser, string subject = "owner")
+    internal static async Task<SessionIdentity> Owner(Browser browser, string subject = "owner")
     {
         var proof = await browser.Proof(subject);
         using var response = await browser.Bootstrap(proof, await browser.Csrf());
@@ -413,18 +413,27 @@ public sealed class BootstrapSessionTests(PostgresFixture postgres)
     [Fact]
     public async Task Required_database_unavailable_fails_closed_for_session_and_authenticated_authority()
     {
-        var (connection, host) = await Host(); await using var dispose = host;
-        using var browser = new Browser(host);
-        var owner = await Owner(browser);
-        // This uniquely named database was created by this test fixture in its own disposable container.
-        await using (var db = PostgresFixture.Identity(connection)) await db.Database.EnsureDeletedAsync();
-        using var session = await browser.Context(owner.AccountSessionId);
-        using var authority = await browser.Authority(owner);
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, session.StatusCode);
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, authority.StatusCode);
+        // Database destruction is isolated from the suite's accumulated migration databases
+        // and checkpoints, as well as every developer resource.
+        var isolated = new PostgresFixture(); await isolated.InitializeAsync();
+        try
+        {
+            var connection = await isolated.CreateDatabase();
+            await using (var db = PostgresFixture.Identity(connection)) await db.Database.MigrateAsync();
+            await using var host = new GoogleTestHost(connection, enableCompletion: true);
+            using var browser = new Browser(host);
+            var owner = await Owner(browser);
+            // This uniquely named database was created by this test fixture in its own disposable container.
+            await isolated.DropOwnedDatabase(connection);
+            using var session = await browser.Context(owner.AccountSessionId);
+            using var authority = await browser.Authority(owner);
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, session.StatusCode);
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, authority.StatusCode);
+        }
+        finally { await isolated.DisposeAsync(); }
     }
 
-    private static async Task WaitForLock(string connection, string fragment)
+    internal static async Task WaitForLock(string connection, string fragment)
     {
         await using var observer = new NpgsqlConnection(connection); await observer.OpenAsync();
         for (var i = 0; i < 150; i++)

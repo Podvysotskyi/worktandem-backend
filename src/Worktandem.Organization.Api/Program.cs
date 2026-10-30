@@ -10,13 +10,17 @@ public partial class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+        builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Warning);
         builder.Services.AddOpenApi();
-        builder.Services.AddDbContext<OrganizationDbContext>(options =>
+        builder.Services.AddCompanySecurity(builder.Configuration);
+        builder.Services.AddDbContext<OrganizationDbContext>((services, options) =>
             options.UseNpgsql(builder.Configuration.GetConnectionString("Organization"),
-                postgres => postgres.SetPostgresVersion(18, 0)));
+                postgres => postgres.SetPostgresVersion(18, 0))
+                .AddInterceptors(services.GetServices<Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor>()));
         builder.Services.AddHealthChecks().AddCheck<DatabaseReadiness>("database", tags: ["ready"]);
 
         var app = builder.Build();
+        app.MapCompanies();
         if (app.Environment.IsDevelopment()) app.MapOpenApi();
         app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
         app.MapHealthChecks("/health/ready", new HealthCheckOptions

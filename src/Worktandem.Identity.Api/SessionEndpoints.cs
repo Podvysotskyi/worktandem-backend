@@ -9,9 +9,29 @@ internal static class SessionEndpoints
 {
     private sealed record BootstrapRequest(Guid PendingLoginId, string Secret);
     private sealed record CompleteRequest(Guid PendingLoginId, string? DisplayName);
+    private sealed record GrantRequest(Guid TargetAccountId, string Capability, bool Active, Guid? ExpectedVersion);
 
     public static void MapAccountSessions(this WebApplication app)
     {
+        app.MapPost("/account/company-operation", async (HttpContext context, IAntiforgery antiforgery, AuthenticationWorkflow workflow) =>
+            await Unsafe(context, antiforgery, async () => Results.Json(new
+            {
+                operationId = await workflow.CompanyOperation(
+                AuthHttp.Digest(context)!, Selected(context), context.TraceIdentifier, context.RequestAborted)
+            })));
+
+        app.MapPost("/platform/reviewer-grants", async (HttpContext context, IAntiforgery antiforgery, AuthenticationWorkflow workflow) =>
+            await Unsafe(context, antiforgery, async () =>
+            {
+                var request = await Body<GrantRequest>(context);
+                var version = await workflow.ReviewerGrant(AuthHttp.Digest(context)!, Selected(context), request.TargetAccountId,
+                    request.Capability, request.Active, request.ExpectedVersion, context.Request.Headers["Idempotency-Key"].ToString(),
+                    context.TraceIdentifier, context.RequestAborted);
+                return Results.Json(new { version });
+            }));
+        app.MapGet("/platform/reviewer-grants/{targetId:guid}", (HttpContext context, Guid targetId, AuthenticationWorkflow workflow) =>
+            Safe(context, async () => Results.Json(await workflow.ReviewerGrants(AuthHttp.Digest(context) ?? throw new AuthenticationFailure("invalid_session", 401),
+                Selected(context), targetId, context.RequestAborted))));
         app.MapPost("/setup/complete", async (HttpContext context, IAntiforgery antiforgery, AuthenticationWorkflow workflow) =>
             await Unsafe(context, antiforgery, async () =>
             {
@@ -63,6 +83,9 @@ internal static class SessionEndpoints
                 return Results.NoContent();
             }));
     }
+
+    private static Guid Selected(HttpContext context) => AuthHttp.Selector(context) is { } selector && Guid.TryParse(selector, out var id)
+        ? id : throw new AuthenticationFailure("account_selection_required", 400);
 
     private static async Task<IResult> Unsafe(HttpContext context, IAntiforgery antiforgery, Func<Task<IResult>> action)
     {

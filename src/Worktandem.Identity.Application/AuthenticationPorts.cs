@@ -41,6 +41,9 @@ public interface IAuthenticationState
     Task<bool> HasAccounts(CancellationToken cancellationToken);
     Task<IReadOnlyList<AccountSession>> BrowserSessions(Guid browserId, CancellationToken cancellationToken);
     Task<IReadOnlyList<PlatformGrant>> Grants(Guid accountId, CancellationToken cancellationToken);
+    Task<GrantReceipt?> GrantReceipt(Guid actor, string key, CancellationToken cancellationToken);
+    void AddGrantReceipt(GrantReceipt receipt);
+    void RemoveGrantReceipt(GrantReceipt receipt);
     Task MarkAttemptSucceeded(Guid id, CancellationToken cancellationToken);
     void AddAccount(Account account);
     void AddIdentity(ExternalIdentity identity);
@@ -52,9 +55,10 @@ public interface IAuthenticationState
 
 public sealed record SessionIdentity(Guid AccountId, Guid AccountSessionId, string DisplayName,
     Guid AccountVersion, Guid? InitialRegistrationOperationId, DateTimeOffset ExpiresAt,
-    DateTimeOffset IdleExpiresAt, IReadOnlyList<string> Capabilities);
+    DateTimeOffset IdleExpiresAt, IReadOnlyList<string> Capabilities, Guid? CompanyCreationOperationId = null);
 
 public sealed record SessionSummary(Guid AccountId, Guid AccountSessionId, string DisplayName);
+public sealed record ReviewerGrantView(string Capability, bool Active, Guid Version);
 
 public sealed record AuthorityEvidence(Guid EvidenceId, Guid RequestId, string Service, string Action,
     DateTimeOffset ValidatedAt, SessionIdentity Identity);

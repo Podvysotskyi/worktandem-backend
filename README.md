@@ -1,12 +1,14 @@
 # Worktandem backend
 
-.NET 10 / ASP.NET Core persistence, Google OIDC, protected bootstrap and server account sessions.
+.NET 10 / ASP.NET Core persistence, Google OIDC, protected bootstrap, server account sessions,
+company application/review and workspace authorization.
 The backend workflows are tested with an isolated provider; live Google and deployment integration
 remain prerequisites. See [implemented authentication scope](docs/authentication.md).
+See [company onboarding contracts and frontend integration](docs/company-onboarding.md).
 
 The scope follows [implementation-readiness docs PR #7](https://github.com/Podvysotskyi/worktandem-docs/pull/7)
 ([merged immutable design](https://github.com/Podvysotskyi/worktandem-docs/blob/f9acaa0e0b596ee452e5daa0e7fa75e4c9e2e70f/docs/implementation/readiness.md)).
-The persistence and handshake milestones are merged; this increment completes backend bootstrap/sessions.
+The persistence and authentication milestones are merged; this increment adds backend onboarding/review.
 
 ## Build and test
 
@@ -66,15 +68,16 @@ Only Identity's incomplete setup singleton is seeded.
   grants and account status history.
 - Organization owns company/application/review records, memberships and company-scoped RBAC.
 - Each service has Domain, Application, Infrastructure and Api projects. Domain is framework-free;
-  Application has no use cases yet; Infrastructure owns its context and migration sources.
+  Application owns authentication or company use cases; Infrastructure owns its context and migration sources.
 - Gateway remains a separate stateless BFF scaffold with no persistence/service references.
 
 Identity exposes configured HTTPS sign-in/bootstrap completion, explicit account-session context,
-logout and a certificate-authenticated internal authority contract. No company, review,
-public status-write or invitation endpoint exists. Privileged bootstrap/authority require
+logout, restricted reviewer provisioning and a certificate-authenticated internal authority contract.
+Organization implements Pending application, independent review and explicit company workspace access.
+No public status-write or invitation endpoint exists. Privileged bootstrap/authority require
 validated fresh MFA plus the explicit deployment assurance gate.
 Do not expose this as a production-ready application: real Google/PKI integration, deployment,
-owner/recovery policy, tenant workflows and client switching/cache UX remain separate work.
+owner/recovery policy, gateway/UI binding and client switching/cache UX remain separate work.
 
 Publish/deploy executable hosts independently using dotnet publish <project> -c Release.
 Container packaging and production deployment remain separate work.
