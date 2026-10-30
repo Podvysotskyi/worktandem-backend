@@ -85,6 +85,24 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         transition.HasIndex(x => new { x.AccountId, x.OccurredAt, x.Id });
         transition.HasIndex(x => new { x.ActorAccountId, x.OperationId }).IsUnique();
 
+        var pending = model.Entity<PendingLogin>();
+        pending.ToTable("pending_logins", t =>
+        {
+            t.HasCheckConstraint("ck_pending_purpose", "purpose IN ('Bootstrap', 'Login', 'Register', 'AddAccount')");
+            t.HasCheckConstraint("ck_pending_lifetime", "expires_at > created_at AND (validated_at IS NULL OR validated_at >= created_at)");
+            t.HasCheckConstraint("ck_pending_return", "return_path IN ('/', '/setup', '/auth/continue')");
+            t.HasCheckConstraint("ck_pending_evidence", "(validated_at IS NULL AND issuer IS NULL AND subject IS NULL AND email IS NULL AND hosted_domain IS NULL AND provider_authenticated_at IS NULL AND NOT mfa_observed AND NOT email_verified) OR (validated_at IS NOT NULL AND issuer IS NOT NULL AND issuer = 'https://accounts.google.com' AND subject IS NOT NULL AND length(subject) > 0)");
+        });
+        pending.Property(x => x.Purpose).HasConversion<string>().HasMaxLength(16);
+        pending.Property(x => x.ReturnPath).HasMaxLength(100);
+        pending.Property(x => x.Issuer).HasMaxLength(256);
+        pending.Property(x => x.Subject).HasMaxLength(255).UseCollation("C");
+        pending.Property(x => x.Email).HasMaxLength(320);
+        pending.Property(x => x.HostedDomain).HasMaxLength(253);
+        pending.HasOne<BrowserSession>().WithMany().HasForeignKey(x => x.BrowserSessionId).OnDelete(DeleteBehavior.Restrict);
+        pending.HasIndex(x => new { x.BrowserSessionId, x.ExpiresAt });
+        pending.HasIndex(x => x.ExpiresAt);
+
         // Service-local relational naming. No cross-service entity registration or shared model.
         foreach (var entity in model.Model.GetEntityTypes())
         {

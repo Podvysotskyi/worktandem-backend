@@ -15,6 +15,9 @@ IDs, UTC instants and Guid versions. Application reserves the use-case/port boun
 no fake identity/authorization services or generic repository framework. Infrastructure maps
 its own domain and owns Npgsql migrations/snapshots. Api composes persistence and probes.
 No persistence entities are HTTP DTOs; no business HTTP contract is enabled.
+The [bounded Google handshake](authentication.md) now has an Application-owned PendingLoginWorkflow
+and store port, a PostgreSQL adapter, and a framework OIDC/antiforgery HTTP adapter.
+It creates temporary proof only; the stable browser principal never supplies account authority.
 
 Neither service references the other's projects or SQL objects. AccountId fields in Organization
 are external identifiers only. Gateway has no domain layers, tables, direct DbContext or service
@@ -44,8 +47,9 @@ and CRM modules stay deferred. Platform grants in Identity never imply a company
 
 Liveness asserts the process can respond. Identity/Organization readiness checks connection and
 pending migrations; missing configuration/database/schema fails closed with 503. Gateway readiness
-remains process-only. OpenAPI is development-only. No auth cookies, Google callbacks, bootstrap
-secret handling, registration, protected business operations or public status writes exist yet.
+remains process-only. OpenAPI is development-only. Identity has a configured Google callback and
+opaque browser-container/antiforgery cookies. It has no usable account-session cookie, bootstrap
+secret handling/completion, registration completion, protected business operation or public status write.
 
 Before enabling any protected operation, implement independently enforced current Identity
 status/session validation, Organization company/membership/scope checks, negative cross-tenant
