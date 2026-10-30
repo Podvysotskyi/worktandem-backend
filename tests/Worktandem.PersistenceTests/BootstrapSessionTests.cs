@@ -115,6 +115,45 @@ public sealed class BootstrapSessionTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task Maximum_length_escaped_bootstrap_secret_fits_its_bounded_json_body_and_oversized_bodies_are_rejected()
+    {
+        var (connection, host) = await Host(); await using var dispose = host;
+        host.SetupSecret.ConfiguredValue = string.Concat(Enumerable.Repeat("<&\u2028é", 1024));
+        Assert.Equal(4096, host.SetupSecret.ConfiguredValue.Length);
+        using var browser = new Browser(host);
+        var proof = await browser.Proof("long-secret-owner");
+        var csrf = await browser.Csrf();
+        async Task<HttpResponseMessage> Send(string path, string payload)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, path)
+            { Content = new StringContent(payload, Encoding.UTF8, "application/json") };
+            request.Headers.Add("X-WT-CSRF", csrf);
+            request.Headers.Add("Origin", "https://localhost");
+            return await browser.Client.SendAsync(request);
+        }
+        var oversized = JsonSerializer.Serialize(new { pendingLoginId = proof, secret = new string('a', 32768) });
+        using var rejected = await Send("/setup/complete", oversized);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, rejected.StatusCode);
+        Assert.Equal("request_too_large", (await rejected.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+        using var otherEndpoint = await Send("/auth/complete", JsonSerializer.Serialize(new { pendingLoginId = proof, displayName = new string('a', 4096) }));
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, otherEndpoint.StatusCode);
+        await using (var before = PostgresFixture.Identity(connection))
+        {
+            Assert.Empty(await before.Set<Account>().ToListAsync());
+            Assert.Null((await before.Set<PendingLogin>().SingleAsync()).ConsumedAt);
+            Assert.Equal(SetupStatus.Incomplete, (await before.Set<SetupState>().SingleAsync()).Status);
+        }
+        var valid = JsonSerializer.Serialize(new { pendingLoginId = proof, secret = host.SetupSecret.ConfiguredValue });
+        Assert.InRange(Encoding.UTF8.GetByteCount(valid), 24576, 32768);
+        using var completed = await Send("/setup/complete", valid);
+        Assert.Equal(HttpStatusCode.Created, completed.StatusCode);
+        await using var database = PostgresFixture.Identity(connection);
+        Assert.Single(await database.Set<Account>().ToListAsync());
+        Assert.Equal(SetupStatus.Completed, (await database.Set<SetupState>().SingleAsync()).Status);
+        Assert.DoesNotContain(host.Logs.Messages, message => message.Contains(host.SetupSecret.ConfiguredValue, StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task First_owner_completion_is_atomic_consumed_audited_company_optional_and_permanently_closed()
     {
         var (connection, host) = await Host(); await using var dispose = host;

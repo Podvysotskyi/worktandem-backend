@@ -14,8 +14,9 @@ internal sealed class FixtureSecret : IBootstrapSecretVerifier
 {
     public const string Value = "fixture-only-bootstrap-secret-never-for-production";
     public bool Enabled { get; set; }
+    public string ConfiguredValue { get; set; } = Value;
     public bool IsConfigured => Enabled;
-    public bool Matches(string entered) => Enabled && SecretComparison.Matches(Value, entered);
+    public bool Matches(string entered) => Enabled && SecretComparison.Matches(ConfiguredValue, entered);
 }
 
 internal sealed class FixtureAssurance : IPrivilegedAssuranceGate

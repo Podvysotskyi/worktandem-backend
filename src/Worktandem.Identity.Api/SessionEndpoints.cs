@@ -35,7 +35,8 @@ internal static class SessionEndpoints
         app.MapPost("/setup/complete", async (HttpContext context, IAntiforgery antiforgery, AuthenticationWorkflow workflow) =>
             await Unsafe(context, antiforgery, async () =>
             {
-                var request = await Body<BootstrapRequest>(context);
+                // A valid 4096-character secret can require 24 KiB when JSON-escaped.
+                var request = await Body<BootstrapRequest>(context, maximumBodyBytes: 32768);
                 var source = context.Connection.RemoteIpAddress?.MapToIPv6().ToString() ?? "unknown";
                 var sourceHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source))).ToLowerInvariant();
                 var identity = await workflow.Bootstrap(AuthHttp.Digest(context)!, request.PendingLoginId,
@@ -93,12 +94,12 @@ internal static class SessionEndpoints
         return await Safe(context, action);
     }
 
-    internal static async Task<T> Body<T>(HttpContext context)
+    internal static async Task<T> Body<T>(HttpContext context, int maximumBodyBytes = 4096)
     {
         if (!context.Request.HasJsonContentType()) throw new AuthenticationFailure("json_required", 415);
-        if (context.Request.ContentLength > 4096) throw new AuthenticationFailure("request_too_large", 413);
+        if (context.Request.ContentLength > maximumBodyBytes) throw new AuthenticationFailure("request_too_large", 413);
         if (context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } size)
-            size.MaxRequestBodySize = 4096;
+            size.MaxRequestBodySize = maximumBodyBytes;
         return await context.Request.ReadFromJsonAsync<T>(context.RequestAborted)
             ?? throw new AuthenticationFailure("invalid_request", 400);
     }
