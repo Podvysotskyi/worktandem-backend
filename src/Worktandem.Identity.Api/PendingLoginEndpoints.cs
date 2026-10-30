@@ -68,6 +68,17 @@ internal static class PendingLoginEndpoints
                 properties.Items["wt.purpose"] = purpose.ToString();
                 if (request.RequireFreshMfa) properties.Items["wt.fresh-assurance"] = "true";
                 await context.ChallengeAsync(GoogleAuthConfiguration.Scheme, properties);
+                // Challenge must finish first: the framework adds protected state after its redirect event.
+                // Fetch cannot follow Google's cross-origin redirect; return the complete challenge URL
+                // only when explicitly requested, preserving the framework's nonce/correlation cookies.
+                if (AuthHttp.Accepts(context, "application/json") &&
+                    context.Response.StatusCode == StatusCodes.Status302Found)
+                {
+                    var authorizationUrl = context.Response.Headers.Location.ToString();
+                    context.Response.Headers.Remove("Location");
+                    context.Response.StatusCode = StatusCodes.Status200OK;
+                    await context.Response.WriteAsJsonAsync(new { authorizationUrl }, context.RequestAborted);
+                }
             }
             catch (LoginFlowException failure)
             {

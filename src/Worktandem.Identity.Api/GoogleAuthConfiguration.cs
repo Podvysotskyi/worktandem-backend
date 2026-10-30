@@ -135,7 +135,7 @@ internal static class GoogleAuthConfiguration
                     OnRemoteFailure = async context =>
                     {
                         context.HandleResponse();
-                        await AuthHttp.Problem(context.HttpContext, 400, "invalid_google_login");
+                        await AuthHttp.CallbackFailure(context.HttpContext, 400, "invalid_google_login");
                     }
                 };
             });

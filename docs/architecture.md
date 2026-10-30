@@ -20,6 +20,8 @@ The [authentication workflows](authentication.md) use Application-owned pending-
 bootstrap/session workflows, explicit transactional PostgreSQL adapters, and framework OIDC,
 antiforgery and certificate-authentication HTTP adapters. The stable browser principal never supplies
 account authority; selected sessions are independently validated from current Identity state.
+Gateway now forwards only the implemented browser contracts through fixed-origin HTTPS transport;
+see [route allowlist and deployment assumptions](gateway.md).
 
 Neither service references the other's projects or SQL objects. AccountId fields in Organization
 are external identifiers only. Gateway has no domain layers, tables, direct DbContext or service
