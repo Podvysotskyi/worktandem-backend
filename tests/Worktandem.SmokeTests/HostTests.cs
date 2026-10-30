@@ -42,14 +42,16 @@ public class HostTests
     [InlineData("/setup/complete")]
     [InlineData("/auth/start")]
     [InlineData("/companies/applications")]
+    [InlineData("/account/company-operation")]
+    [InlineData("/platform/reviewer-grants")]
     [InlineData("/platform/applications/00000000-0000-0000-0000-000000000001/decision")]
     [InlineData("/platform/users/00000000-0000-0000-0000-000000000001/suspend")]
     [InlineData("/platform/users/00000000-0000-0000-0000-000000000001/reinstate")]
     [InlineData("/invitations/accept")]
-    public async Task Feature_and_privileged_writes_remain_absent(string path)
+    public async Task Unconfigured_writes_fail_closed_and_deferred_writes_remain_absent(string path)
     {
-        await AssertNoWrite<Identity.Api.Program>(path, path is "/auth/start" or "/setup/complete" ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.NotFound);
-        await AssertNoWrite<Organization.Api.Program>(path);
+        await AssertNoWrite<Identity.Api.Program>(path, path is "/auth/start" or "/setup/complete" or "/account/company-operation" or "/platform/reviewer-grants" ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.NotFound);
+        await AssertNoWrite<Organization.Api.Program>(path, path == "/companies/applications" ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.NotFound);
         await AssertNoWrite<Gateway.Program>(path);
     }
 

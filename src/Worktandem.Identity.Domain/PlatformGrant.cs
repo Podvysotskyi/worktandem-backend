@@ -9,4 +9,11 @@ public sealed class PlatformGrant(Guid accountId, string capabilityKey, Guid? gr
     public DateTimeOffset? RevokedAt { get; private set; } = revokedAt;
     public Guid? RevokedByAccountId { get; private set; } = revokedByAccountId;
     public Guid Version { get; private set; } = version;
+
+    public void SetActive(bool active, Guid actor, DateTimeOffset now)
+    {
+        if (active) { GrantedByAccountId = actor; GrantedAt = now; RevokedAt = null; RevokedByAccountId = null; }
+        else { RevokedAt = now; RevokedByAccountId = actor; }
+        Version = Guid.CreateVersion7();
+    }
 }

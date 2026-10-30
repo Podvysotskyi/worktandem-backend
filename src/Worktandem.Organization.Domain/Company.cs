@@ -12,4 +12,25 @@ public sealed class Company(Guid id, string name, string slug, CompanyStatus sta
     public DateTimeOffset CreatedAt { get; private set; } = createdAt;
     public DateTimeOffset UpdatedAt { get; private set; } = updatedAt;
     public Guid Version { get; private set; } = version;
+
+    public void Submit(CompanyApplication application, DateTimeOffset now)
+    {
+        if (application.CompanyId != Id || application.ApplicantAccountId != CreatedByAccountId ||
+            (CurrentApplicationId is not null && Status != CompanyStatus.Rejected))
+            throw new InvalidOperationException("Application cannot be submitted.");
+        CurrentApplicationId = application.Id;
+        Name = application.CompanyName;
+        Status = CompanyStatus.Pending;
+        UpdatedAt = now;
+        Version = Guid.CreateVersion7();
+    }
+
+    public void Decide(ReviewOutcome outcome, DateTimeOffset now)
+    {
+        if (Status != CompanyStatus.Pending || CurrentApplicationId is null)
+            throw new InvalidOperationException("Company is not pending.");
+        Status = outcome == ReviewOutcome.Approved ? CompanyStatus.Approved : CompanyStatus.Rejected;
+        UpdatedAt = now;
+        Version = Guid.CreateVersion7();
+    }
 }

@@ -58,6 +58,10 @@ public sealed class PostgresAuthenticationTransactions(IdentityDbContext databas
             await db.Set<AccountSession>().Where(s => s.BrowserSessionId == id).ToListAsync(ct);
         public async Task<IReadOnlyList<PlatformGrant>> Grants(Guid id, CancellationToken ct) =>
             await db.Set<PlatformGrant>().Where(g => g.AccountId == id).ToListAsync(ct);
+        public Task<GrantReceipt?> GrantReceipt(Guid actor, string key, CancellationToken ct) =>
+            db.Set<GrantReceipt>().SingleOrDefaultAsync(r => r.ActorAccountId == actor && r.Key == key, ct);
+        public void AddGrantReceipt(GrantReceipt receipt) => db.Add(receipt);
+        public void RemoveGrantReceipt(GrantReceipt receipt) => db.Remove(receipt);
         public async Task MarkAttemptSucceeded(Guid id, CancellationToken ct) =>
             (await db.Set<SetupAttempt>().SingleAsync(a => a.Id == id, ct)).MarkSucceeded();
         public void AddAccount(Account account) => db.Add(account);

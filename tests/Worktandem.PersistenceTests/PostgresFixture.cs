@@ -16,6 +16,7 @@ public sealed class PostgresFixture : IAsyncLifetime
     private readonly string password = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
     private string? containerName;
     private string connection = "";
+    private readonly HashSet<string> ownedConnections = new(StringComparer.Ordinal);
 
     public async Task InitializeAsync()
     {
@@ -35,6 +36,9 @@ public sealed class PostgresFixture : IAsyncLifetime
                 Password = password,
                 Database = "postgres",
                 Timeout = 2,
+                // Each test owns distinct databases; idle per-database pools must not accumulate
+                // across the suite and exhaust PostgreSQL while concurrency tests open connections.
+                Pooling = false,
                 IncludeErrorDetail = false
             }.ConnectionString;
             for (var attempt = 0; ; attempt++)
@@ -60,7 +64,24 @@ public sealed class PostgresFixture : IAsyncLifetime
         await db.OpenAsync();
         await using var create = new NpgsqlCommand("CREATE DATABASE " + name, db);
         await create.ExecuteNonQueryAsync();
-        return new NpgsqlConnectionStringBuilder(connection) { Database = name }.ConnectionString;
+        var owned = new NpgsqlConnectionStringBuilder(connection) { Database = name }.ConnectionString;
+        ownedConnections.Add(owned);
+        return owned;
+    }
+
+    public async Task DropOwnedDatabase(string ownedConnection)
+    {
+        if (!ownedConnections.Contains(ownedConnection))
+            throw new InvalidOperationException("Refusing to drop a database not created by this fixture.");
+        var name = new NpgsqlConnectionStringBuilder(ownedConnection).Database!;
+        if (name.Length != 37 || !name.StartsWith("test_", StringComparison.Ordinal) || !name[5..].All(char.IsAsciiHexDigit))
+            throw new InvalidOperationException("Unexpected test database identifier.");
+        await using var admin = new NpgsqlConnection(connection); await admin.OpenAsync();
+        // Native PG18 force-drop through the fixture admin connection. No provider-wide pool clearing
+        // or API-host migration lock is involved; the exact generated target was verified above.
+        await using var drop = new NpgsqlCommand("DROP DATABASE \"" + name + "\" WITH (FORCE)", admin);
+        await drop.ExecuteNonQueryAsync();
+        ownedConnections.Remove(ownedConnection);
     }
 
     public static IdentityDbContext Identity(string connectionString) =>

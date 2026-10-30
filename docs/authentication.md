@@ -3,7 +3,8 @@
 The backend authentication workflows in [readiness PR2](https://github.com/Podvysotskyi/worktandem-docs/blob/f9acaa0e0b596ee452e5daa0e7fa75e4c9e2e70f/docs/implementation/readiness.md)
 are implemented and tested with an isolated provider and PostgreSQL. Live Google client/claims,
 deployment certificates, ingress and shared-key configuration remain unverified prerequisites.
-Company onboarding/review and frontend account/company switching are later slices.
+Backend [company onboarding/review](company-onboarding.md) consumes these contracts;
+frontend account/company switching and gateway binding remain later integration work.
 
 ## HTTP contracts
 
@@ -31,7 +32,7 @@ Login of an unknown identity requires a new Register/AddAccount flow.
 
 Normal creation is closed before setup. After setup, a new normal account receives one server-issued
 InitialRegistrationOperationId, retained across later sign-ins. It receives no company or platform
-grant. Organization's future creation handler must obtain/validate that operation through the
+grant. Organization's creation handler obtains/validates that operation through the
 authenticated authority contract rather than trusting a client-supplied replacement.
 The bootstrap owner has no initial registration operation or mandatory company membership.
 An existing actor can start Login with requireFreshMfa=true to request Google's fresh amr/auth_time
@@ -154,6 +155,7 @@ multiple accounts/browsers, parallel tab CSRF writes, logout isolation, idle/abs
 grant/status checks, reinstatement and delayed callback rejection, expiry during a held database lock,
 certificate caller denial, request-bound authority, unavailable database, migration replay and audit guards.
 
-This completes the backend bootstrap/session increment. Company forms/approval/workspace access,
-owner-to-reviewer grant UI/command, client cache/switching UX, invitations and unresolved owner/recovery
-policies remain later slices. No live Google, production deployment or company authorization is claimed.
+This completes the backend bootstrap/session increment. The following company increment adds
+backend approval/workspace access and a limited reviewer grant command described separately.
+Frontend forms, grant UI, client cache/switching UX, invitations and unresolved owner/recovery
+policies remain later slices. No live Google or production deployment is claimed.

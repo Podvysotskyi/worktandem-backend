@@ -161,6 +161,75 @@ public sealed class AuthenticationWorkflow(IAuthenticationTransactions transacti
                 Identity(account, session, action == "organization.account" ? [] : new[] { action }));
         }, cancellationToken);
 
+    public Task<Guid> CompanyOperation(string digest, Guid sessionId, string correlation, CancellationToken ct) =>
+        transactions.Run(async (state, token) =>
+        {
+            var (browser, account, _) = await ResolveLocked(state, digest, sessionId, token);
+            if (account.InitialRegistrationOperationId is { } initial) return initial;
+            var grants = Capabilities(await state.Grants(account.Id, token));
+            if (!grants.Contains("platform.owner", StringComparer.Ordinal)) throw Failure("operation_denied", 403);
+            var existing = account.CompanyCreationOperationId;
+            var id = account.EnsureCompanyCreationOperation(clock.GetUtcNow());
+            if (existing is null) state.AddAudit(new AuthenticationAudit(Guid.CreateVersion7(), "company.operation_issued",
+                account.Id, browser.Id, null, clock.GetUtcNow(), account.Version, correlation, account.Id));
+            return id;
+        }, ct);
+
+    // Deliberately limited to the two reviewer capabilities. Owner/recovery/status powers stay closed.
+    public Task<Guid> ReviewerGrant(string digest, Guid sessionId, Guid targetId, string capability,
+        bool active, Guid? expectedVersion, string key, string correlation, CancellationToken ct) => transactions.Run(async (state, token) =>
+        {
+            if (string.IsNullOrWhiteSpace(key) || key.Length > 100 || key.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not '-' and not '_'))
+                throw Failure("invalid_idempotency_key", 422);
+            await state.LockSetup(token);
+            var (browser, actor, session) = await ResolveLocked(state, digest, sessionId, token);
+            var grants = Capabilities(await state.Grants(actor.Id, token));
+            if (capability is not "platform.companies.read" and not "platform.companies.review" || actor.Id == targetId ||
+                !grants.Contains("platform.owner", StringComparer.Ordinal) || !grants.Contains("platform.grants.manage", StringComparer.Ordinal))
+                throw Failure("grant_denied", 403);
+            var target = await state.LockAccount(targetId, token);
+            var targetGrants = await state.Grants(targetId, token);
+            var now = clock.GetUtcNow();
+            if (!assurance.IsAvailable || browser.ExpiresAt <= now || !session.IsUsable(now) ||
+                !Fresh(session.MfaObserved, session.ProviderAuthenticatedAt, session.EvidenceObservedAt, now))
+                throw Failure("authority_denied", 403);
+            if (target?.Status != AccountStatus.Active) throw Failure("target_unavailable", 409);
+            var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+                new { targetId, capability, active, expectedVersion })));
+            var receipt = await state.GrantReceipt(actor.Id, key, token);
+            if (receipt is not null && receipt.ExpiresAt > now)
+            {
+                if (receipt.PayloadHash != hash) throw Failure("idempotency_payload_conflict", 409);
+                return receipt.ResultVersion;
+            }
+            if (receipt is not null) { state.RemoveGrantReceipt(receipt); await state.Save(token); }
+            var grant = targetGrants.SingleOrDefault(g => g.CapabilityKey == capability);
+            if (grant?.Version != expectedVersion) throw Failure("grant_version_conflict", 412);
+            if (grant is null)
+            {
+                if (!active) throw Failure("grant_not_found", 404);
+                grant = new PlatformGrant(targetId, capability, actor.Id, now, null, null, Guid.CreateVersion7()); state.AddGrant(grant);
+            }
+            else grant.SetActive(active, actor.Id, now);
+            state.AddAudit(new AuthenticationAudit(Guid.CreateVersion7(), active ? "reviewer.granted" : "reviewer.revoked",
+                actor.Id, browser.Id, null, now, grant.Version, correlation, targetId, expectedVersion, capability));
+            state.AddGrantReceipt(new GrantReceipt(actor.Id, key, hash, grant.Version, now.AddDays(7)));
+            return grant.Version;
+        }, ct);
+
+    public Task<IReadOnlyList<ReviewerGrantView>> ReviewerGrants(string digest, Guid sessionId, Guid targetId, CancellationToken ct) =>
+        transactions.Run<IReadOnlyList<ReviewerGrantView>>(async (state, token) =>
+        {
+            var (_, actor, session) = await ResolveLocked(state, digest, sessionId, token);
+            var grants = Capabilities(await state.Grants(actor.Id, token));
+            var targetGrants = await state.Grants(targetId, token);
+            if (!grants.Contains("platform.owner", StringComparer.Ordinal) || !grants.Contains("platform.grants.manage", StringComparer.Ordinal) ||
+                !assurance.IsAvailable || !Fresh(session.MfaObserved, session.ProviderAuthenticatedAt, session.EvidenceObservedAt, clock.GetUtcNow()))
+                throw Failure("authority_denied", 403);
+            return targetGrants.Where(g => g.CapabilityKey is "platform.companies.read" or "platform.companies.review")
+                .Select(g => new ReviewerGrantView(g.CapabilityKey, g.RevokedAt is null, g.Version)).ToArray();
+        }, ct);
+
     private async Task<(BrowserSession Browser, Account Account, AccountSession Session)> ResolveLocked(
         IAuthenticationState state, string digest, Guid sessionId, CancellationToken ct)
     {
@@ -214,7 +283,7 @@ public sealed class AuthenticationWorkflow(IAuthenticationTransactions transacti
 
     private static SessionIdentity Identity(Account account, AccountSession session, IReadOnlyList<string> capabilities) =>
         new(account.Id, session.Id, account.DisplayName, account.Version, account.InitialRegistrationOperationId,
-            session.ExpiresAt, session.IdleExpiresAt, capabilities);
+            session.ExpiresAt, session.IdleExpiresAt, capabilities, account.CompanyCreationOperationId);
 
     private static AuthenticationAudit Audit(string name, Guid? actor, Guid browser, Guid? proof, Guid version, string correlation, DateTimeOffset now) =>
         new(Guid.CreateVersion7(), name, actor, browser, proof, now, version, correlation);

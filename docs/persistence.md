@@ -27,11 +27,11 @@ one live session per account/container, immutable authentication_audit and trans
 - Case-sensitive canonical issuer + subject is globally unique. Current scope requires
   Google and canonical https://accounts.google.com. A partial unique AccountId index applies
   only to Google; it does not decide future-provider cardinality. Email is mutable evidence,
-  not an account identity key. Exactly one login per active-account creation is a future
-  workflow invariant; storage enforces at most one.
+  not an account identity key. Account-creation workflows atomically create the one login;
+  storage enforces at most one.
 - AccountSession's composite FK binds its identity to the same account. Browser credentials
   have only a unique SHA-256 hex digest field; raw credentials/tokens/secrets have no columns.
-  Runtime credential generation/verification and expiry/revocation enforcement arrive with auth.
+  Authentication workflows enforce runtime credential verification and expiry/revocation.
 - SetupState has exactly the permitted singleton key, completion-field checks and one
   incomplete migration seed. Triggers prohibit deleting/truncating the marker or changing
   completed state. The historical initial-owner FK restricts physical deletion; controlled
@@ -86,13 +86,14 @@ Never aim these commands at existing data without a reviewed deployment/backup p
 No database update is part of API startup. Production roles and a separate migration identity
 remain deployment work.
 
-Each service has an initial schema migration and a history-protection upgrade. Down migrations
+Each service has an initial schema migration and a history-protection upgrade, followed by
+its service-owned feature migrations. Down migrations
 exist for empty disposable development environments; they destroy state and must never be used
 as an automatic production rollback or way to reopen setup. Deploy a forward repair instead.
 
 ## Verification and limits
 
-The real PostgreSQL suite applies initial then history migrations on empty task-owned databases,
+The real PostgreSQL suite applies initial then all feature migrations on empty task-owned databases,
 repeats migration application and replays generated idempotent scripts. It checks model/snapshot
 consistency, Google/tenant/registration keys, constrained session identity, optimistic lost-update
 failure, reason/history integrity, first-owner row-lock contention and rollback, permanent setup
@@ -101,5 +102,13 @@ no Google client or live bootstrap secret.
 
 The authentication suite adds actual framework OIDC, bootstrap, account-session and certificate
 handler tests against this database. It does not establish live Google/MFA or deployed TLS,
-company authorization, invitation acceptance or production database permission separation.
-Company and public global-status workflows remain absent.
+invitation acceptance or production database permission separation. The company suite adds
+actual cross-service HTTP authority, tenant authorization, decision races, atomic owner
+activation and rollback. Public global-status and invitation workflows remain absent.
+
+The onboarding migrations add Organization's immutable `company_audit` and seven-day
+actor/operation/target/payload-bound `operation_receipts`. Identity separately owns reviewer
+`grant_receipts`, target/capability/prior-version audit fields and the optional bootstrap-owner
+company creation operation. These are scoped persistence additions for the documented contracts;
+there are no cross-service FKs or shared transaction. Runtime roles, retention cleanup and
+backup/recovery remain controlled environment work. No user, company, grant or credential is seeded.

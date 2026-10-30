@@ -1,7 +1,8 @@
 namespace Worktandem.Identity.Domain;
 
 public sealed class AuthenticationAudit(Guid id, string eventName, Guid? actorAccountId,
-    Guid browserSessionId, Guid? pendingLoginId, DateTimeOffset occurredAt, Guid resultVersion, string correlationId)
+    Guid browserSessionId, Guid? pendingLoginId, DateTimeOffset occurredAt, Guid resultVersion, string correlationId,
+    Guid? targetAccountId = null, Guid? priorVersion = null, string? capabilityKey = null)
 {
     public Guid Id { get; private set; } = id;
     public string EventName { get; private set; } = eventName;
@@ -12,4 +13,7 @@ public sealed class AuthenticationAudit(Guid id, string eventName, Guid? actorAc
     public DateTimeOffset OccurredAt { get; private set; } = occurredAt;
     public Guid ResultVersion { get; private set; } = resultVersion;
     public string CorrelationId { get; private set; } = correlationId;
+    public Guid? TargetAccountId { get; private set; } = targetAccountId;
+    public Guid? PriorVersion { get; private set; } = priorVersion;
+    public string? CapabilityKey { get; private set; } = capabilityKey;
 }

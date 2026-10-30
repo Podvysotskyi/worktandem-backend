@@ -107,12 +107,22 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
         var audit = model.Entity<AuthenticationAudit>();
         audit.ToTable("authentication_audit", t =>
-            t.HasCheckConstraint("ck_auth_audit_event", "event_name IN ('bootstrap.completed', 'account.registered', 'session.created', 'session.logged_out', 'container.logged_out', 'authority.validated')"));
+            t.HasCheckConstraint("ck_auth_audit_event", "event_name IN ('bootstrap.completed', 'account.registered', 'session.created', 'session.logged_out', 'container.logged_out', 'authority.validated', 'company.operation_issued', 'reviewer.granted', 'reviewer.revoked')"));
         audit.Property(x => x.EventName).HasMaxLength(64);
         audit.Property(x => x.CorrelationId).HasMaxLength(100);
+        audit.Property(x => x.CapabilityKey).HasMaxLength(100);
         audit.HasOne<Account>().WithMany().HasForeignKey(x => x.ActorAccountId).OnDelete(DeleteBehavior.Restrict);
+        audit.HasOne<Account>().WithMany().HasForeignKey(x => x.TargetAccountId).OnDelete(DeleteBehavior.Restrict);
         audit.HasOne<BrowserSession>().WithMany().HasForeignKey(x => x.BrowserSessionId).OnDelete(DeleteBehavior.Restrict);
         audit.HasIndex(x => new { x.ActorAccountId, x.OccurredAt, x.Id });
+
+        var receipt = model.Entity<GrantReceipt>();
+        receipt.ToTable("grant_receipts");
+        receipt.HasKey(x => new { x.ActorAccountId, x.Key });
+        receipt.Property(x => x.Key).HasMaxLength(100).UseCollation("C");
+        receipt.Property(x => x.PayloadHash).HasMaxLength(64);
+        receipt.HasOne<Account>().WithMany().HasForeignKey(x => x.ActorAccountId).OnDelete(DeleteBehavior.Restrict);
+        receipt.HasIndex(x => x.ExpiresAt);
 
         var attempts = model.Entity<SetupAttempt>();
         attempts.ToTable("setup_attempts", t => t.HasCheckConstraint("ck_attempt_source", "source_hash ~ '^[0-9a-f]{64}$'"));
