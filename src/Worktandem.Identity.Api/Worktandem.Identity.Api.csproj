@@ -2,6 +2,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.14" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.14" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Certificate" Version="10.0.14" />
     <ProjectReference Include="../Worktandem.Identity.Application/Worktandem.Identity.Application.csproj" />
     <ProjectReference Include="../Worktandem.Identity.Infrastructure/Worktandem.Identity.Infrastructure.csproj" />
   </ItemGroup>

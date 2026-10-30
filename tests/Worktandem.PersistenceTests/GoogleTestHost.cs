@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authentication.Certificate;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -11,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Worktandem.Identity.Api;
+using Worktandem.Identity.Application;
 
 namespace Worktandem.PersistenceTests;
 
@@ -35,12 +37,16 @@ internal sealed class CapturedLogs : ILoggerProvider
     }
 }
 
-internal sealed class GoogleTestHost(string connection) : WebApplicationFactory<Program>
+internal sealed class GoogleTestHost(string connection, bool enableCompletion = false) : WebApplicationFactory<Program>
 {
     public GoogleSimulator Provider { get; } = new();
     public TestClock Clock { get; } = new();
     public CapturedLogs Logs { get; } = new();
     public string? OidcFailure { get; private set; }
+    public FixtureSecret SetupSecret { get; } = new() { Enabled = enableCompletion };
+    public FixtureAssurance Assurance { get; } = new() { IsAvailable = enableCompletion };
+    public RollbackBootstrapInterceptor Rollback { get; } = new();
+    public FixtureCertificates Certificates { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -49,7 +55,9 @@ internal sealed class GoogleTestHost(string connection) : WebApplicationFactory<
         {
             ["ConnectionStrings:Identity"] = connection,
             ["Worktandem:Google:ClientId"] = "fixture-client",
-            ["Worktandem:Google:ClientSecret"] = "fixture-client-secret"
+            ["Worktandem:Google:ClientSecret"] = "fixture-client-secret",
+            ["Worktandem:Internal:OrganizationCertificateSha256"] =
+                Certificates.Organization.GetCertHashString(System.Security.Cryptography.HashAlgorithmName.SHA256)
         }));
         builder.ConfigureLogging(logging => logging.AddProvider(Logs));
         builder.ConfigureTestServices(services =>
@@ -61,6 +69,18 @@ internal sealed class GoogleTestHost(string connection) : WebApplicationFactory<
             services.AddSingleton<IGoogleAuthAvailability>(new Available());
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Clock);
+            services.RemoveAll<IBootstrapSecretVerifier>();
+            services.AddSingleton<IBootstrapSecretVerifier>(SetupSecret);
+            services.RemoveAll<IPrivilegedAssuranceGate>();
+            services.AddSingleton<IPrivilegedAssuranceGate>(Assurance);
+            services.AddSingleton<Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor>(Rollback);
+            services.AddSingleton<IStartupFilter>(new FixtureCertificateFeature(Certificates));
+            services.PostConfigure<CertificateAuthenticationOptions>("InternalCertificate", options =>
+            {
+                options.ChainTrustValidationMode = System.Security.Cryptography.X509Certificates.X509ChainTrustMode.CustomRootTrust;
+                options.CustomTrustStore.Add(Certificates.Root);
+                options.RevocationMode = System.Security.Cryptography.X509Certificates.X509RevocationMode.NoCheck;
+            });
             services.PostConfigure<OpenIdConnectOptions>(GoogleAuthConfigurationName, options =>
             {
                 options.Configuration = Provider.Configuration;
@@ -81,6 +101,7 @@ internal sealed class GoogleTestHost(string connection) : WebApplicationFactory<
     {
         await base.DisposeAsync();
         Provider.Dispose();
+        Certificates.Dispose();
     }
     private sealed class Available : IGoogleAuthAvailability { public bool IsConfigured => true; }
 

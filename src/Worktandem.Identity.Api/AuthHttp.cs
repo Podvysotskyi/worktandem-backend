@@ -13,6 +13,11 @@ internal static class AuthHttp
     public static string? Digest(HttpContext context)
     {
         var raw = context.Request.Cookies[BrowserCookie];
+        return CredentialDigest(raw);
+    }
+
+    public static string? CredentialDigest(string? raw)
+    {
         if (raw is null || raw.Length != 43 || raw.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not '-' and not '_')) return null;
         try
         {

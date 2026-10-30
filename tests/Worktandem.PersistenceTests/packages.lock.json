@@ -40,6 +40,14 @@
         "resolved": "3.1.4",
         "contentHash": "5mj99LvCqrq3CNi06xYdyIAXOEh+5b33F2nErCzI5zWiDdLHXiPXEWFSUAF8zlIv0ZWqjZNCwHTQeAPYbF3pCg=="
       },
+      "Microsoft.AspNetCore.Authentication.Certificate": {
+        "type": "Transitive",
+        "resolved": "10.0.14",
+        "contentHash": "jgKmbW6WLBnM6RWcEPQcEP4/jDjXUwNwSyjtfaNhBGemAVKpmPhQnjbGHkSs8QTnxmiSzsyFOhr1ehTJL36tyg==",
+        "dependencies": {
+          "Microsoft.Extensions.Caching.Memory": "10.0.14"
+        }
+      },
       "Microsoft.AspNetCore.Authentication.OpenIdConnect": {
         "type": "Transitive",
         "resolved": "10.0.14",
@@ -554,6 +562,7 @@
       "worktandem.identity.api": {
         "type": "Project",
         "dependencies": {
+          "Microsoft.AspNetCore.Authentication.Certificate": "[10.0.14, )",
           "Microsoft.AspNetCore.Authentication.OpenIdConnect": "[10.0.14, )",
           "Microsoft.AspNetCore.OpenApi": "[10.0.14, )",
           "Worktandem.Identity.Application": "[1.0.0, )",

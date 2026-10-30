@@ -13,4 +13,15 @@ public sealed class ExternalIdentity(Guid id, Guid accountId, string provider, s
     public DateTimeOffset ObservedAt { get; private set; } = observedAt;
     public DateTimeOffset AssociatedAt { get; private set; } = associatedAt;
     public Guid Version { get; private set; } = version;
+
+    public void Observe(PendingLogin proof, DateTimeOffset now)
+    {
+        if (proof.Issuer != Issuer || proof.Subject != Subject)
+            throw new InvalidOperationException("Identity ownership cannot change.");
+        Email = proof.Email;
+        EmailVerified = proof.EmailVerified;
+        HostedDomain = proof.HostedDomain;
+        ObservedAt = now;
+        Version = Guid.CreateVersion7();
+    }
 }
