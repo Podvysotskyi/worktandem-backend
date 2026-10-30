@@ -3,8 +3,7 @@
 ## Baseline and design dependency
 
 This first slice follows [docs PR #7](https://github.com/Podvysotskyi/worktandem-docs/pull/7)
-at [b2cd99e1](https://github.com/Podvysotskyi/worktandem-docs/blob/b2cd99e1a6596dfcd3c3efd2e9fe1e6e28390bca/docs/implementation/readiness.md),
-an unmerged design dependency when this implementation was prepared.
+merged at [f9acaa0e](https://github.com/Podvysotskyi/worktandem-docs/blob/f9acaa0e0b596ee452e5daa0e7fa75e4c9e2e70f/docs/implementation/readiness.md).
 
 Verified 2026-10-29: [PostgreSQL 18.6](https://www.postgresql.org/support/versioning/),
 [EF Core 10.0.14](https://www.nuget.org/packages/Microsoft.EntityFrameworkCore/10.0.14),
@@ -20,6 +19,8 @@ pins or unrelated dependencies change.
 
 IdentityDbContext owns accounts, external_identities, setup_state, platform_grants,
 browser_sessions, account_sessions and account_status_transitions.
+The subsequent [bounded authentication subset](authentication.md) adds pending_logins for
+browser-bound temporary flow/proof evidence; its migration changes no Organization tables.
 
 - Case-sensitive canonical issuer + subject is globally unique. Current scope requires
   Google and canonical https://accounts.google.com. A partial unique AccountId index applies
@@ -96,7 +97,7 @@ failure, reason/history integrity, first-owner row-lock contention and rollback,
 closure and readiness with/without migrations. Fixtures produce only synthetic records and use
 no Google client or live bootstrap secret.
 
-These are schema and transaction tests. They do not establish working Google login, MFA,
-bootstrap validation, registration gates, company approval, session authorization, invitation
-acceptance or production database permission separation. All related routes remain absent.
-The next slice supplies OIDC/PendingLogin/bootstrap/session use cases and their security tests.
+These foundation tests do not establish working account login, MFA, bootstrap validation,
+company approval, session authorization, invitation acceptance or production permission separation.
+The bounded authentication subset adds actual framework OIDC/PendingLogin simulator tests;
+account/session/bootstrap completion and all business routes remain absent.

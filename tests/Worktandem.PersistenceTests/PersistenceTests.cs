@@ -46,7 +46,7 @@ public sealed class PersistenceTests(PostgresFixture postgres)
         foreach (DbContext db in new DbContext[] { identity, organization })
         {
             var migrations = db.Database.GetMigrations().ToArray();
-            Assert.Equal(2, migrations.Length);
+            Assert.Equal(db is IdentityDbContext ? 3 : 2, migrations.Length);
             await db.GetService<IMigrator>().MigrateAsync(migrations[0]);
             await db.Database.MigrateAsync();
             await db.Database.MigrateAsync();

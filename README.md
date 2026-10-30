@@ -1,11 +1,12 @@
 # Worktandem backend
 
-.NET 10 / ASP.NET Core persistence foundation. Authentication, authorization and business
-workflows are not implemented. Only operational probes and development OpenAPI are exposed.
+.NET 10 / ASP.NET Core persistence foundation plus a bounded Google OIDC/PendingLogin
+handshake. Permanent account login, bootstrap completion, authorization and business workflows
+remain disabled. See [implemented authentication scope](docs/authentication.md).
 
 The scope follows [implementation-readiness docs PR #7](https://github.com/Podvysotskyi/worktandem-docs/pull/7)
-([immutable design](https://github.com/Podvysotskyi/worktandem-docs/blob/b2cd99e1a6596dfcd3c3efd2e9fe1e6e28390bca/docs/implementation/readiness.md)).
-That design is an unmerged dependency at this change's preparation.
+([merged immutable design](https://github.com/Podvysotskyi/worktandem-docs/blob/f9acaa0e0b596ee452e5daa0e7fa75e4c9e2e70f/docs/implementation/readiness.md)).
+The first persistence milestone is merged; the authentication handshake is a partial PR2 deliverable.
 
 ## Build and test
 
@@ -64,11 +65,12 @@ Only Identity's incomplete setup singleton is seeded.
   Application has no use cases yet; Infrastructure owns its context and migration sources.
 - Gateway remains a separate stateless BFF scaffold with no persistence/service references.
 
-There are no Google login, setup, session, company, review, status-write or invitation endpoints.
-Do not expose this foundation as a working production application. The next slice implements
-validated Google OIDC, temporary pending login, bootstrap and server sessions with negative
-security tests. Privileged assurance, recovery/last-owner coordination and invitation mailbox
-proof remain gated by the design.
+Identity exposes configured HTTPS auth/context, auth/start, signin-google callback and
+browser-owned pending-proof lookup. These create no permanent account or session.
+There are no setup-completion, session, company, review, status-write or invitation endpoints.
+Do not expose this foundation as a working production application. The next slice completes
+protected bootstrap and server sessions. Privileged assurance, recovery/last-owner coordination
+and invitation mailbox proof remain gated by the design.
 
 Publish/deploy executable hosts independently using dotnet publish <project> -c Release.
 Container packaging and production deployment remain separate work.

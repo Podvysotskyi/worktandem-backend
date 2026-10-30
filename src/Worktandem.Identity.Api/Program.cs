@@ -10,20 +10,25 @@ public partial class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+        // Callback URLs contain one-time codes/state. Never emit framework request URLs or auth payload diagnostics.
+        builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Warning);
+        builder.Logging.AddFilter("Microsoft.AspNetCore.Authentication", LogLevel.None);
         builder.Services.AddOpenApi();
+        builder.Services.AddGoogleLogin(builder.Configuration);
         builder.Services.AddDbContext<IdentityDbContext>(options =>
             options.UseNpgsql(builder.Configuration.GetConnectionString("Identity"),
                 postgres => postgres.SetPostgresVersion(18, 0)));
         builder.Services.AddHealthChecks().AddCheck<DatabaseReadiness>("database", tags: ["ready"]);
 
         var app = builder.Build();
+        app.UsePendingGoogleLogin();
         if (app.Environment.IsDevelopment()) app.MapOpenApi();
         app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
         app.MapHealthChecks("/health/ready", new HealthCheckOptions
         {
             Predicate = registration => registration.Tags.Contains("ready")
         });
-        // No startup DDL, Google callbacks, setup, session or business routes in this persistence slice.
+        // No startup DDL, bootstrap completion, usable account sessions or business routes in this subset.
         app.Run();
     }
 }

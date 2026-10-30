@@ -48,16 +48,16 @@ public class HostTests
     [InlineData("/invitations/accept")]
     public async Task Feature_and_privileged_writes_remain_absent(string path)
     {
-        await AssertNoWrite<Identity.Api.Program>(path);
+        await AssertNoWrite<Identity.Api.Program>(path, path == "/auth/start" ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.NotFound);
         await AssertNoWrite<Organization.Api.Program>(path);
         await AssertNoWrite<Gateway.Program>(path);
     }
 
-    private static async Task AssertNoWrite<T>(string path) where T : class
+    private static async Task AssertNoWrite<T>(string path, HttpStatusCode expected = HttpStatusCode.NotFound) where T : class
     {
         await using var factory = new WebApplicationFactory<T>();
         using var client = factory.CreateClient();
         using var response = await client.PostAsync(path, new StringContent("{}"));
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(expected, response.StatusCode);
     }
 }
